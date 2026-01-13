@@ -234,33 +234,7 @@ export default function LeadershipPalacePage() {
       setShowMapNodeModal(true);
   };
 
-  const handleSaveMapNode = (e: React.FormEvent) => {
-      e.preventDefault();
-      const nodeData = {
-          title: mapNodeForm.title,
-          type: mapNodeForm.type as any,
-          x: Number(mapNodeForm.x),
-          y: Number(mapNodeForm.y),
-          description: mapNodeForm.description,
-          levelReq: Number(mapNodeForm.levelReq),
-          questionsCount: Number(mapNodeForm.questionsCount),
-          subject: mapNodeForm.subject,
-          status: mapNodeForm.status as any,
-          customQuestions: mapNodeForm.customQuestions || []
-      };
 
-      if (editingMapNode) {
-          updateMapNode({ ...editingMapNode, ...nodeData });
-          showToast("تم تحديث المحطة بنجاح", "success");
-      } else {
-          addMapNode({
-              id: Date.now().toString(),
-              ...nodeData
-          });
-          showToast("تم إضافة المحطة بنجاح", "success");
-      }
-      setShowMapNodeModal(false);
-  };
 
   // Market Modal States
   const [showMarketModal, setShowMarketModal] = useState(false);
