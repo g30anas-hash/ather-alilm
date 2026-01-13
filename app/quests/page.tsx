@@ -27,15 +27,15 @@ export default function QuestsPage() {
 
   const availableQuests = quests ? quests.filter(q => !myAcceptedQuestIds.includes(q.id) && !myCompletedQuestIds.includes(q.id)) : [];
   
-  const activeQuests = quests ? quests.filter(q => 
+  const activeQuests = quests?.filter(q => 
     myAcceptedQuestIds.includes(q.id) && 
     !myCompletedQuestIds.includes(q.id) &&
     !myPendingQuestIds.includes(q.id)
-  ) : [];
+  ) ?? [];
 
-  const pendingReviewQuests = quests ? quests.filter(q => myPendingQuestIds.includes(q.id)) : [];
+  const pendingReviewQuests = quests?.filter(q => myPendingQuestIds.includes(q.id)) ?? [];
   
-  const completedQuests = quests ? quests.filter(q => myCompletedQuestIds.includes(q.id)) : [];
+  const completedQuests = quests?.filter(q => myCompletedQuestIds.includes(q.id)) ?? [];
 
   const handleAccept = (questId: number) => {
     acceptQuest(questId);
