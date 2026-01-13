@@ -67,6 +67,10 @@ export interface Quest {
   image: string;
   type: string;
   status: 'pending' | 'approved' | 'rejected';
+  subject?: string;
+  grade?: string;
+  rewardGold?: number;
+  rewardXP?: number;
 }
 
 export interface SupportMessage {
