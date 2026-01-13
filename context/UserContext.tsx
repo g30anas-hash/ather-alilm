@@ -472,27 +472,44 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           purchaseLogs: mappedPurchaseLogs
         }));
 
-        // Restore session if exists
-        if (typeof window !== 'undefined') {
-            const savedId = localStorage.getItem("userId");
-            if (savedId) {
-                const user = mappedUsers.find((u: any) => u.id.toString() === savedId);
-                if (user) {
-                    setState(prev => ({ 
+        // Auth State Listener
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (session?.user?.email) {
+                // Find user by email from the fetched users
+                // Note: In a real app with RLS, we would fetch 'me' specifically
+                const { data: userProfile } = await supabase.from('users').select('*').eq('email', session.user.email).single();
+                
+                if (userProfile) {
+                     const mappedUser = {
+                        ...userProfile,
+                        assignedClasses: userProfile.assigned_classes,
+                        childrenIds: userProfile.children_ids,
+                        classId: userProfile.class_id,
+                        parentId: userProfile.parent_id
+                     };
+                     
+                     setState(prev => ({ 
                         ...prev, 
-                        role: user.role, 
-                        name: user.name, 
-                        coins: user.coins, 
-                        xp: user.xp, 
-                        level: user.level,
-                        badges: user.badges || [],
-                        inventory: user.inventory || [],
-                        notifications: user.notifications || [],
-                        acceptedQuests: user.accepted_quests || []
+                        role: mappedUser.role, 
+                        name: mappedUser.name, 
+                        coins: mappedUser.coins, 
+                        xp: mappedUser.xp, 
+                        level: mappedUser.level,
+                        badges: mappedUser.badges || [],
+                        inventory: mappedUser.inventory || [],
+                        notifications: mappedUser.notifications || [],
+                        acceptedQuests: mappedUser.accepted_quests || []
                     }));
                 }
+            } else {
+                // Signed out
+                setState(prev => ({ ...prev, role: null }));
             }
-        }
+        });
+
+        return () => {
+            subscription.unsubscribe();
+        };
 
       } catch (error) {
         console.error('Error fetching initial data:', error);
@@ -778,7 +795,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setState(prev => ({ ...prev, stages: prev.stages.filter(s => s !== stage) }));
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setState(prev => ({ ...prev, role: null }));
     if (typeof window !== 'undefined') {
         localStorage.removeItem("userId");

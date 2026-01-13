@@ -5,17 +5,20 @@ import { useRouter } from "next/navigation";
 import GoldButton from "@/components/GoldButton";
 import PageTransition from "@/components/PageTransition";
 import { cn } from "@/lib/utils";
-import { User, GraduationCap, Crown, Users, Mail, User as UserIcon, ArrowLeft, Shield, Sparkles } from "lucide-react";
+import { User, GraduationCap, Crown, Users, Mail, User as UserIcon, ArrowLeft, Shield, Sparkles, Lock } from "lucide-react";
 import { useUser, UserRole, UserData } from "@/context/UserContext";
 import { useToast } from "@/context/ToastContext";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function OathRoomPage() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: "", email: "" });
+  const [formData, setFormData] = useState({ name: "", email: "", password: "" });
+  const [isLogin, setIsLogin] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { setRole, updateName, addUser, allUsers } = useUser();
+  const { addUser } = useUser();
   const { showToast } = useToast();
 
   const roles = [
@@ -46,69 +49,88 @@ export default function OathRoomPage() {
   ];
 
   const handleConfirm = async () => {
-    if (!selectedRole) {
+    if (!selectedRole && !isLogin) {
         showToast("الرجاء اختيار دور للمتابعة", "error");
         return;
     }
-    if (!formData.name.trim()) {
+    if (!formData.email.trim() || !formData.password.trim()) {
+        showToast("الرجاء إدخال البريد الإلكتروني وكلمة المرور", "error");
+        return;
+    }
+    if (!isLogin && !formData.name.trim()) {
         showToast("الرجاء إدخال الاسم", "error");
         return;
     }
 
-    const email = formData.email || `${formData.name.replace(/\s/g, '').toLowerCase()}@ather.com`;
+    setIsLoading(true);
 
-    // Check if user exists (Mock Login)
-    const existingUser = allUsers.find(u => 
-        u.email === email || (u.name === formData.name && u.role === selectedRole)
-    );
+    try {
+        if (isLogin) {
+            // Login
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: formData.email,
+                password: formData.password,
+            });
 
-    if (existingUser) {
-        // Login Logic
-        setRole(existingUser.role);
-        updateName(existingUser.name);
-        
-        // Save session
-        if (typeof window !== 'undefined') {
-            localStorage.setItem("userId", existingUser.id.toString());
+            if (error) throw error;
+
+            showToast("تم تسجيل الدخول بنجاح!", "success");
+            
+            // Fetch user role to redirect correctly (handled by context listener mostly, but good for redirect)
+            const { data: userData } = await supabase.from('users').select('role').eq('email', formData.email).single();
+            const role = userData?.role || 'student';
+            
+            setTimeout(() => {
+                switch(role) {
+                   case 'student': router.push("/student-city"); break;
+                   case 'teacher': router.push("/teacher-hall"); break;
+                   case 'leader': router.push("/leadership-palace"); break;
+                   case 'parent': router.push("/parent-observatory"); break;
+                   default: router.push("/student-city");
+                }
+            }, 1000);
+
+        } else {
+            // Sign Up
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: formData.email,
+                password: formData.password,
+            });
+
+            if (authError) throw authError;
+
+            if (authData.user) {
+                // Create User Profile in DB
+                const newUser: UserData = {
+                    id: Date.now(), // Temporary ID until DB auto-increments or UUID
+                    name: formData.name,
+                    email: formData.email,
+                    role: selectedRole as UserRole,
+                    // Default assignments based on role
+                    ...(selectedRole === 'student' ? { classId: "1-A", parentId: null } : {}),
+                    ...(selectedRole === 'teacher' ? { subject: "عام", assignedClasses: [] } : {}),
+                    ...(selectedRole === 'parent' ? { childrenIds: [] } : {})
+                };
+                
+                await addUser(newUser);
+                showToast("تم إنشاء الحساب بنجاح! جاري الدخول...", "success");
+
+                 setTimeout(() => {
+                    switch(selectedRole) {
+                       case 'student': router.push("/student-city"); break;
+                       case 'teacher': router.push("/teacher-hall"); break;
+                       case 'leader': router.push("/leadership-palace"); break;
+                       case 'parent': router.push("/parent-observatory"); break;
+                       default: router.push("/student-city");
+                    }
+                }, 1000);
+            }
         }
-
-        showToast(`أهلاً بعودتك يا ${existingUser.name}!`, 'success');
-    } else {
-        // Registration Logic
-        const newUser: UserData = {
-            id: Date.now(),
-            name: formData.name,
-            email: email,
-            role: selectedRole as UserRole,
-            // Default assignments based on role
-            ...(selectedRole === 'student' ? { classId: "1-A", parentId: null } : {}),
-            ...(selectedRole === 'teacher' ? { subject: "عام", assignedClasses: [] } : {}),
-            ...(selectedRole === 'parent' ? { childrenIds: [] } : {})
-        };
-        await addUser(newUser);
-
-        // Set current session
-        setRole(selectedRole as UserRole);
-        updateName(formData.name);
-        
-        if (typeof window !== 'undefined') {
-            localStorage.setItem("userId", newUser.id.toString());
-        }
-
-        const roleName = roles.find(r => r.id === selectedRole)?.label;
-        showToast(`تم تسجيل ${roleName}: ${formData.name} بنجاح!`, 'success');
+    } catch (error: any) {
+        showToast(error.message || "حدث خطأ أثناء العملية", "error");
+    } finally {
+        setIsLoading(false);
     }
-    
-    // Smooth transition delay
-    setTimeout(() => {
-        switch(selectedRole) {
-           case 'student': router.push("/student-city"); break;
-           case 'teacher': router.push("/teacher-hall"); break;
-           case 'leader': router.push("/leadership-palace"); break;
-           case 'parent': router.push("/parent-observatory"); break;
-           default: router.push("/student-city");
-        }
-    }, 500);
   };
 
   return (
@@ -137,13 +159,13 @@ export default function OathRoomPage() {
               غرفة العهد
             </h1>
             <p className="text-[#F4E4BC]/60 text-lg font-[family-name:var(--font-scheherazade)]">
-              اختر مسارك في المملكة وابدأ كتابة أسطورتك
+              {isLogin ? "سجل دخولك لإكمال مسيرتك" : "اختر مسارك في المملكة وابدأ كتابة أسطورتك"}
             </p>
           </motion.div>
           
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-             {/* Left Column: Role Selection */}
-             <div className="lg:col-span-8">
+             {/* Left Column: Role Selection (Only for Sign Up) */}
+             <div className={cn("lg:col-span-8 transition-all duration-500", isLogin ? "opacity-50 pointer-events-none grayscale" : "opacity-100")}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {roles.map((role, idx) => (
                         <motion.div 
@@ -151,7 +173,7 @@ export default function OathRoomPage() {
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: idx * 0.1 }}
-                            onClick={() => setSelectedRole(role.id)}
+                            onClick={() => !isLogin && setSelectedRole(role.id)}
                             className={cn(
                                 "relative p-6 rounded-xl border-2 cursor-pointer transition-all duration-300 group overflow-hidden",
                                 selectedRole === role.id 
@@ -207,27 +229,29 @@ export default function OathRoomPage() {
                             <Shield className="w-8 h-8 text-[#FFD700]" />
                         </div>
                         <h2 className="text-2xl font-bold text-[#F4E4BC] font-[family-name:var(--font-amiri)]">
-                            وثيقة العهد
+                            {isLogin ? "تسجيل الدخول" : "وثيقة العهد"}
                         </h2>
                     </div>
 
                     <div className="space-y-6 flex-1">
-                         <div className="relative group">
-                            <label className="block text-[#F4E4BC]/70 text-sm mb-2 font-[family-name:var(--font-cairo)]">الاسم الكامل</label>
-                            <div className="relative">
-                                <UserIcon className="absolute right-3 top-3.5 w-5 h-5 text-[#F4E4BC]/30 group-focus-within:text-[#DAA520] transition-colors" />
-                                <input 
-                                    type="text" 
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                                    className="w-full bg-[#000]/40 border border-[#5D4037] rounded-xl pr-10 pl-4 py-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none transition-all focus:bg-[#000]/60 placeholder:text-[#F4E4BC]/20"
-                                    placeholder="اكتب اسمك هنا..."
-                                />
+                        {!isLogin && (
+                             <div className="relative group">
+                                <label className="block text-[#F4E4BC]/70 text-sm mb-2 font-[family-name:var(--font-cairo)]">الاسم الكامل</label>
+                                <div className="relative">
+                                    <UserIcon className="absolute right-3 top-3.5 w-5 h-5 text-[#F4E4BC]/30 group-focus-within:text-[#DAA520] transition-colors" />
+                                    <input 
+                                        type="text" 
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                        className="w-full bg-[#000]/40 border border-[#5D4037] rounded-xl pr-10 pl-4 py-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none transition-all focus:bg-[#000]/60 placeholder:text-[#F4E4BC]/20"
+                                        placeholder="اكتب اسمك هنا..."
+                                    />
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         <div className="relative group">
-                            <label className="block text-[#F4E4BC]/70 text-sm mb-2 font-[family-name:var(--font-cairo)]">البريد الإلكتروني (اختياري)</label>
+                            <label className="block text-[#F4E4BC]/70 text-sm mb-2 font-[family-name:var(--font-cairo)]">البريد الإلكتروني</label>
                             <div className="relative">
                                 <Mail className="absolute right-3 top-3.5 w-5 h-5 text-[#F4E4BC]/30 group-focus-within:text-[#DAA520] transition-colors" />
                                 <input 
@@ -240,8 +264,22 @@ export default function OathRoomPage() {
                             </div>
                         </div>
 
+                        <div className="relative group">
+                            <label className="block text-[#F4E4BC]/70 text-sm mb-2 font-[family-name:var(--font-cairo)]">كلمة المرور</label>
+                            <div className="relative">
+                                <Lock className="absolute right-3 top-3.5 w-5 h-5 text-[#F4E4BC]/30 group-focus-within:text-[#DAA520] transition-colors" />
+                                <input 
+                                    type="password" 
+                                    value={formData.password}
+                                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                    className="w-full bg-[#000]/40 border border-[#5D4037] rounded-xl pr-10 pl-4 py-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none transition-all focus:bg-[#000]/60 placeholder:text-[#F4E4BC]/20"
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                        </div>
+
                         <AnimatePresence>
-                            {selectedRole && (
+                            {selectedRole && !isLogin && (
                                 <motion.div 
                                     initial={{ height: 0, opacity: 0 }}
                                     animate={{ height: 'auto', opacity: 1 }}
@@ -259,16 +297,24 @@ export default function OathRoomPage() {
                         </AnimatePresence>
                     </div>
 
-                    <div className="mt-8">
+                    <div className="mt-8 space-y-3">
                         <GoldButton 
-                            className={cn("w-full py-4 text-lg shadow-lg", (!selectedRole || !formData.name) && "opacity-50 grayscale cursor-not-allowed")}
+                            className={cn("w-full py-4 text-lg shadow-lg", isLoading && "opacity-70 cursor-wait")}
                             onClick={handleConfirm}
-                            disabled={!selectedRole || !formData.name}
+                            disabled={isLoading || (!isLogin && !selectedRole)}
                         >
-                            توقيع ودخول
+                            {isLoading ? "جاري المعالجة..." : (isLogin ? "دخول" : "توقيع ودخول")}
                         </GoldButton>
-                        {!selectedRole && (
-                            <p className="text-center text-[#F4E4BC]/30 text-xs mt-3">
+                        
+                        <button 
+                            onClick={() => setIsLogin(!isLogin)}
+                            className="w-full text-[#F4E4BC]/50 hover:text-[#FFD700] text-sm transition-colors py-2"
+                        >
+                            {isLogin ? "ليس لديك حساب؟ سجل الآن" : "لديك حساب بالفعل؟ سجل الدخول"}
+                        </button>
+
+                        {!selectedRole && !isLogin && (
+                            <p className="text-center text-[#F4E4BC]/30 text-xs">
                                 * يجب اختيار دور لإكمال التسجيل
                             </p>
                         )}
