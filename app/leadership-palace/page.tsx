@@ -569,8 +569,20 @@ export default function LeadershipPalacePage() {
           showToast("تم تحديث بيانات المستخدم بنجاح", "success");
       } else {
           // Add new
-          const id = Math.floor(Math.random() * 10000);
-          const userToAdd = { ...newUser, id, role: activeUserTab } as UserData;
+          const id = Date.now(); // Use Date.now() for unique numeric ID
+          const userToAdd = { 
+            ...newUser, 
+            id, 
+            role: activeUserTab,
+            // Add default values to prevent undefined issues
+            coins: 0,
+            xp: 0,
+            level: 1,
+            badges: [],
+            inventory: [],
+            notifications: [],
+            acceptedQuests: []
+          } as UserData;
           addUser(userToAdd);
           showToast("تم إضافة المستخدم بنجاح", "success");
       }

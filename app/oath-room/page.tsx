@@ -76,7 +76,7 @@ export default function OathRoomPage() {
 
             showToast("تم تسجيل الدخول بنجاح!", "success");
             
-            // Fetch user role to redirect correctly (handled by context listener mostly, but good for redirect)
+            // Fetch user role to redirect correctly
             const { data: userData } = await supabase.from('users').select('role').eq('email', formData.email).single();
             const role = userData?.role || 'student';
             
@@ -91,32 +91,50 @@ export default function OathRoomPage() {
             }, 1000);
 
         } else {
-            // Sign Up
+            // Sign Up (Now restricted to "Activation" only)
+            
+            // 1. Check if email exists in 'users' table (Pre-registered by Admin)
+            const { data: existingProfile, error: profileError } = await supabase
+                .from('users')
+                .select('*')
+                .eq('email', formData.email)
+                .single();
+
+            if (!existingProfile) {
+                showToast("عذراً، هذا البريد غير مسجل في سجلات المملكة. يرجى مراجعة الإدارة لإنشاء ملف لك أولاً.", "error");
+                setIsLoading(false);
+                return;
+            }
+
+            // 2. If profile exists, proceed to create Auth account
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email: formData.email,
                 password: formData.password,
+                options: {
+                    data: {
+                        name: formData.name,
+                        role: selectedRole
+                    }
+                }
             });
 
             if (authError) throw authError;
 
             if (authData.user) {
-                // Create User Profile in DB
-                const newUser: UserData = {
-                    id: Date.now(), // Temporary ID until DB auto-increments or UUID
-                    name: formData.name,
-                    email: formData.email,
-                    role: selectedRole as UserRole,
-                    // Default assignments based on role
-                    ...(selectedRole === 'student' ? { classId: "1-A", parentId: null } : {}),
-                    ...(selectedRole === 'teacher' ? { subject: "عام", assignedClasses: [] } : {}),
-                    ...(selectedRole === 'parent' ? { childrenIds: [] } : {})
-                };
+                // 3. Update the existing profile with any missing details if needed
+                // But mainly we just wanted to link Auth to this email.
+                // We might want to ensure the role matches what Admin set vs what they selected?
+                // Ideally we force the role from the DB.
                 
-                await addUser(newUser);
-                showToast("تم إنشاء الحساب بنجاح! جاري الدخول...", "success");
+                if (existingProfile.role !== selectedRole) {
+                     showToast(`تنبيه: تم تسجيلك بصلاحية "${existingProfile.role}" حسب سجلات الإدارة.`, "info");
+                }
+
+                showToast("تم تفعيل حسابك بنجاح! جاري الدخول...", "success");
 
                  setTimeout(() => {
-                    switch(selectedRole) {
+                    const finalRole = existingProfile.role; // Use the role from DB, not selection
+                    switch(finalRole) {
                        case 'student': router.push("/student-city"); break;
                        case 'teacher': router.push("/teacher-hall"); break;
                        case 'leader': router.push("/leadership-palace"); break;
