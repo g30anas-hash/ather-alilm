@@ -20,22 +20,22 @@ export default function QuestsPage() {
   const [activeTab, setActiveTab] = useState<'available' | 'active' | 'completed'>('available');
 
   // Filter Quests
-  const myAcceptedQuestIds = acceptedQuests.map(q => q.id);
-  const mySubmissions = submissions.filter(s => s.studentName === name); // Ideally filter by ID if available
+  const myAcceptedQuestIds = acceptedQuests ? acceptedQuests.map(q => q.id) : [];
+  const mySubmissions = submissions ? submissions.filter(s => s.studentName === name) : []; // Ideally filter by ID if available
   const myCompletedQuestIds = mySubmissions.filter(s => s.status === 'approved').map(s => s.questId);
   const myPendingQuestIds = mySubmissions.filter(s => s.status === 'pending').map(s => s.questId);
 
-  const availableQuests = quests.filter(q => !myAcceptedQuestIds.includes(q.id) && !myCompletedQuestIds.includes(q.id));
+  const availableQuests = quests ? quests.filter(q => !myAcceptedQuestIds.includes(q.id) && !myCompletedQuestIds.includes(q.id)) : [];
   
-  const activeQuests = quests.filter(q => 
+  const activeQuests = quests ? quests.filter(q => 
     myAcceptedQuestIds.includes(q.id) && 
     !myCompletedQuestIds.includes(q.id) &&
     !myPendingQuestIds.includes(q.id)
-  );
+  ) : [];
 
-  const pendingReviewQuests = quests.filter(q => myPendingQuestIds.includes(q.id));
+  const pendingReviewQuests = quests ? quests.filter(q => myPendingQuestIds.includes(q.id)) : [];
   
-  const completedQuests = quests.filter(q => myCompletedQuestIds.includes(q.id));
+  const completedQuests = quests ? quests.filter(q => myCompletedQuestIds.includes(q.id)) : [];
 
   const handleAccept = (questId: number) => {
     acceptQuest(questId);
