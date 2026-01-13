@@ -433,6 +433,7 @@ function TeacherHallPageInner() {
       const newQuest = {
           id: Date.now(),
           title: questForm.title,
+          description: questForm.description,
           subtitle: questForm.description || "مهمة دراسية جديدة",
           cost: Number(questForm.gold),
           image: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=2573&auto=format&fit=crop", // Default education image
