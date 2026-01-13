@@ -49,7 +49,7 @@ export default function QuestsPage() {
         return;
     }
 
-    submitQuest(selectedQuest.id, selectedQuest.title, answer);
+    submitQuest({ questId: selectedQuest.id, questTitle: selectedQuest.title, answer });
     showToast("تم إرسال المهمة للمراجعة بنجاح", "success");
     setAnswer("");
     setSelectedQuest(null);
