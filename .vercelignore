@@ -1,0 +1,13 @@
+.next
+.next/
+node_modules
+node_modules/
+dist
+dist/
+.git
+.git/
+.vercel
+.vercel/
+coverage
+coverage/
+*.log
