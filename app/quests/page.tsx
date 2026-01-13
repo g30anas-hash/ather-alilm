@@ -20,7 +20,7 @@ export default function QuestsPage() {
   const [activeTab, setActiveTab] = useState<'available' | 'active' | 'completed'>('available');
 
   // Filter Quests
-  const myAcceptedQuestIds = acceptedQuests ? acceptedQuests.map(q => q.id) : [];
+  const myAcceptedQuestIds = acceptedQuests ? acceptedQuests : [];
   const mySubmissions = submissions ? submissions.filter(s => s.studentName === name) : []; // Ideally filter by ID if available
   const myCompletedQuestIds = mySubmissions.filter(s => s.status === 'approved').map(s => s.questId);
   const myPendingQuestIds = mySubmissions.filter(s => s.status === 'pending').map(s => s.questId);
