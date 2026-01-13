@@ -62,6 +62,7 @@ export interface Quest {
   id: number;
   title: string;
   subtitle: string;
+  description: string;
   cost: number;
   image: string;
   type: string;
