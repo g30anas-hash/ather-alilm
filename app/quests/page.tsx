@@ -351,3 +351,11 @@ export default function QuestsPage() {
     </>
   );
 }
+
+export default function QuestsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-[#DAA520]">جاري التحميل...</div>}>
+      <QuestsPageContent />
+    </Suspense>
+  );
+}

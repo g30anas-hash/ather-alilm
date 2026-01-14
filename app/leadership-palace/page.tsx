@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import GameCard from "@/components/GameCard";
 import GoldButton from "@/components/GoldButton";
 import SidebarWorld from "@/components/SidebarWorld";
@@ -4767,5 +4767,13 @@ export default function LeadershipPalacePage() {
       <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} />
       <AtherMind />
     </>
+  );
+}
+
+export default function LeadershipPalacePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-[#DAA520]">جاري التحميل...</div>}>
+      <LeadershipPalacePageContent />
+    </Suspense>
   );
 }

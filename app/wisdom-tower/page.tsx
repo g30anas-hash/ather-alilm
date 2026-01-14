@@ -388,3 +388,11 @@ export default function WisdomTowerPage() {
     </>
   );
 }
+
+export default function WisdomTowerPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-[#DAA520]">جاري التحميل...</div>}>
+      <WisdomTowerPageContent />
+    </Suspense>
+  );
+}
