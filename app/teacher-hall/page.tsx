@@ -107,7 +107,7 @@ function TeacherHallPageInner() {
   const [showBehaviorModal, setShowBehaviorModal] = useState(false);
   const [selectedBroadcast, setSelectedBroadcast] = useState<any>(null);
   const [activeMessageTab, setActiveMessageTab] = useState<'all' | 'students' | 'parents' | 'admin' | 'broadcasts'>('all');
-  const { id, name, submissions, gradeQuest, allUsers, classes, logout, addQuest, role, acceptedQuests, acceptQuest, addCoins, submitQuest, quests, addBehaviorRequest, supportMessages, markSupportMessageAsRead, addToSchedule, addToWeeklyPlan, schedule, weeklyPlan, addQuestion, questionBank, behaviorRecords, broadcasts, addLesson, lessons } = useUser();
+  const { id, name, submissions, gradeQuest, allUsers, classes, logout, addQuest, role, acceptedQuests, acceptQuest, addCoins, submitQuest, quests, addBehaviorRequest, supportMessages, markSupportMessageAsRead, addToSchedule, addToWeeklyPlan, schedule, weeklyPlan, addQuestion, questionBank, behaviorRecords, broadcasts, addLesson, lessons, addCompetition } = useUser();
   const { showToast } = useToast();
   const [currentDate, setCurrentDate] = useState("");
 
