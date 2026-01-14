@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import PageTransition from "@/components/PageTransition";
 import SidebarWorld from "@/components/SidebarWorld";
 import MobileNav from "@/components/MobileNav";
@@ -34,7 +34,7 @@ const generateMockQuestions = (subject: string, count: number): Question[] => {
   });
 };
 
-export default function KnowledgeMapsPage() {
+function KnowledgeMapsContent() {
   const router = useRouter();
   const { addQuest, addXP, addCoins, mapNodes } = useUser();
   const { showToast } = useToast();
@@ -393,5 +393,13 @@ export default function KnowledgeMapsPage() {
         </main>
       </PageTransition>
     </>
+  );
+}
+
+export default function KnowledgeMapsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0a192f] flex items-center justify-center text-[#4ECDC4]">جاري تحميل الخريطة...</div>}>
+      <KnowledgeMapsContent />
+    </Suspense>
   );
 }
