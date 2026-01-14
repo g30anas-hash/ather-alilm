@@ -39,7 +39,8 @@ import {
   Image as ImageIcon,
   Crown,
   ScrollText,
-  Trophy
+  Trophy,
+  Swords
 } from "lucide-react";
 import PageTransition from "@/components/PageTransition";
 import MobileNav from "@/components/MobileNav";
