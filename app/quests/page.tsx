@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useUser, Quest } from "@/context/UserContext";
 import { useToast } from "@/context/ToastContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,7 +12,7 @@ import SidebarWorld from "@/components/SidebarWorld";
 import FantasyModal from "@/components/FantasyModal";
 import { cn } from "@/lib/utils";
 
-export default function QuestsPage() {
+function QuestsPageContent() {
   const { quests, acceptQuest, submitQuest, acceptedQuests, submissions, name } = useUser();
   const { showToast } = useToast();
   

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import PageTransition from "@/components/PageTransition";
 import SidebarWorld from "@/components/SidebarWorld";
 import MobileNav from "@/components/MobileNav";
@@ -78,7 +78,7 @@ const marketItems: MarketItem[] = [
   }
 ];
 
-export default function TreasuresPage() {
+function TreasuresPageContent() {
   const { coins, spendCoins, addItemToInventory, inventory, recordPurchase, name, allUsers, role } = useUser();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'market' | 'inventory'>('market');

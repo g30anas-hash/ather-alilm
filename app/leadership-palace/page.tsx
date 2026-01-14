@@ -108,7 +108,7 @@ const CollapsibleSection = ({ title, children, defaultOpen = false }: { title: s
   );
 };
 
-export default function LeadershipPalacePage() {
+function LeadershipPalacePageContent() {
   const [activeView, setActiveView] = useState('home');
   const [currentDate, setCurrentDate] = useState("");
 

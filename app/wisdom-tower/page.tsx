@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import GameCard from "@/components/GameCard";
 import SidebarWorld from "@/components/SidebarWorld";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,7 +12,7 @@ import { useUser } from "@/context/UserContext";
 import NotificationCenter from "@/components/NotificationCenter";
 import GoldButton from "@/components/GoldButton";
 
-export default function WisdomTowerPage() {
+function WisdomTowerPageContent() {
   const [activeTab, setActiveTab] = useState<'achievements' | 'journeys' | 'leaderboard' | 'behavior'>('achievements');
   const { xp, level, coins, name, behaviorRecords } = useUser();
   const [mounted, setMounted] = useState(false);
