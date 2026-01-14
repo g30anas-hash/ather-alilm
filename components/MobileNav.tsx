@@ -6,31 +6,46 @@ import { Menu, X, Star, Shield, Scroll, Map, CheckCircle2, Users, Landmark, Swor
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { useUser } from "@/context/UserContext";
+import { useUser, UserRole } from "@/context/UserContext";
 
 interface NavItem {
   icon: React.ReactNode;
   label: string;
   href: string;
+  roles?: UserRole[];
 }
 
-const items: NavItem[] = [
-  { icon: <Landmark className="w-6 h-6" />, label: "بوابة المدينة", href: "/student-city" },
-  { icon: <ScrollText className="w-6 h-6" />, label: "خرائط المعرفة", href: "/knowledge-maps" },
-  { icon: <Sword className="w-6 h-6" />, label: "تحديات الرحلة", href: "/teacher-hall" },
-  { icon: <Gem className="w-6 h-6" />, label: "الكنوز", href: "/treasures" },
-  { icon: <Shield className="w-6 h-6" />, label: "برج الحكمة", href: "/wisdom-tower" },
-  { icon: <Mail className="w-6 h-6" />, label: "رسائل الحكام", href: "#" },
+const allItems: NavItem[] = [
+  // Student
+  { icon: <Landmark className="w-6 h-6" />, label: "بوابة المدينة", href: "/student-city", roles: ['student'] },
+  { icon: <ScrollText className="w-6 h-6" />, label: "خرائط المعرفة", href: "/knowledge-maps", roles: ['student'] },
+  { icon: <Sword className="w-6 h-6" />, label: "تحديات الرحلة", href: "/teacher-hall", roles: ['student'] },
+  { icon: <Gem className="w-6 h-6" />, label: "الكنوز", href: "/treasures", roles: ['student'] },
+  { icon: <Shield className="w-6 h-6" />, label: "برج الحكمة", href: "/wisdom-tower", roles: ['student'] },
+  { icon: <Mail className="w-6 h-6" />, label: "رسائل الحكام", href: "/student-city?view=messages", roles: ['student'] },
+  
+  // Teacher
+  { icon: <Landmark className="w-6 h-6" />, label: "قصر المعلمين", href: "/teacher-hall", roles: ['teacher'] },
+  { icon: <Mail className="w-6 h-6" />, label: "الحمام الزاجل", href: "/teacher-hall?view=messages", roles: ['teacher'] },
+  { icon: <Users className="w-6 h-6" />, label: "الطلاب", href: "/teacher-hall?view=students", roles: ['teacher'] },
+
+  // Leader
+  { icon: <Home className="w-6 h-6" />, label: "بوابة القصر", href: "/leadership-palace", roles: ['leader'] },
+  
+  // Parent
+  { icon: <Users className="w-6 h-6" />, label: "المرصد", href: "/parent-observatory", roles: ['parent'] },
+
+  // Common
   { icon: <Map className="w-6 h-6" />, label: "عقل أثير", href: "/ather-mind" },
-  { icon: <Home className="w-6 h-6" />, label: "بوابة القصر", href: "/leadership-palace" },
-  { icon: <Users className="w-6 h-6" />, label: "المرصد", href: "/parent-observatory" },
 ];
 
 export default function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useUser();
+  const { logout, role } = useUser();
+
+  const items = allItems.filter(item => !item.roles || (role && item.roles.includes(role)));
 
   const handleLogout = () => {
     logout();

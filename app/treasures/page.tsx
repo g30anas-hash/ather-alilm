@@ -119,6 +119,24 @@ export default function TreasuresPage() {
     }, 1000);
   };
 
+  const getRarityText = (rarity: string) => {
+    switch (rarity) {
+        case 'legendary': return 'أسطوري';
+        case 'epic': return 'ملحمي';
+        case 'rare': return 'نادر';
+        default: return 'شائع';
+    }
+  };
+
+  const getTypeText = (type: string) => {
+    switch (type) {
+        case 'frame': return 'إطار';
+        case 'badge': return 'وسام';
+        case 'consumable': return 'استهلاكي';
+        default: return type;
+    }
+  };
+
   const getRarityColor = (rarity: string) => {
     switch (rarity) {
         case 'legendary': return 'text-[#FFD700] border-[#FFD700] bg-[#FFD700]/10';
@@ -131,25 +149,28 @@ export default function TreasuresPage() {
   return (
     <>
       <MobileNav />
+      <div className="hidden md:block fixed right-0 top-0 z-50 h-screen">
+        <SidebarWorld />
+      </div>
       <PageTransition>
-        <main className="min-h-screen bg-[#0a192f] flex overflow-hidden">
-          {/* Sidebar */}
-          <div className="relative z-20 hidden md:block h-screen">
-            <SidebarWorld />
-          </div>
+        <main className="min-h-screen bg-[url('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=2568&auto=format&fit=crop')] bg-cover bg-center bg-fixed font-[family-name:var(--font-cairo)]">
+          {/* Atmospheric Overlays */}
+          <div className="absolute inset-0 bg-[#0a0502]/70 mix-blend-multiply z-0 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#1E120A] via-transparent to-[#1E120A]/80 z-0 pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_0%,_#000000_100%)] opacity-50 z-0 pointer-events-none" />
 
-          <div className="flex-1 relative overflow-hidden flex flex-col">
+          <div className="relative z-10 max-w-6xl mx-auto p-6 md:p-12 md:mr-80 min-h-screen flex flex-col">
              {/* Header */}
-             <header className="p-8 pb-4 flex flex-col md:flex-row justify-between items-center gap-6 border-b border-[#DAA520]/20 bg-[#0a192f]/50 backdrop-blur-sm z-10">
+             <header className="mb-8 flex flex-col md:flex-row justify-between items-end gap-6">
                 <div>
-                   <h1 className="text-4xl font-bold text-[#FFD700] font-[family-name:var(--font-amiri)] flex items-center gap-3">
-                      <Gem className="w-8 h-8" />
+                   <h1 className="text-4xl md:text-5xl font-bold text-[#FFD700] font-[family-name:var(--font-amiri)] flex items-center gap-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                      <Gem className="w-10 h-10" />
                       الخزنة الملكية
                    </h1>
-                   <p className="text-[#F4E4BC]/60 mt-1">أنفق ذهبك بحكمة واجمع النوادر</p>
+                   <p className="text-[#F4E4BC]/80 mt-2 text-lg font-[family-name:var(--font-scheherazade)]">أنفق ذهبك بحكمة واجمع النوادر لتزين مسيرتك</p>
                 </div>
 
-                <div className="bg-[#2A1B0E] px-6 py-3 rounded-xl border border-[#FFD700] flex items-center gap-4 shadow-[0_0_20px_rgba(218,165,32,0.2)]">
+                <div className="bg-[#1E120A]/80 backdrop-blur-md px-6 py-3 rounded-xl border border-[#DAA520] flex items-center gap-4 shadow-[0_0_20px_rgba(218,165,32,0.2)]">
                    <div className="text-right">
                       <p className="text-[#F4E4BC]/60 text-xs font-[family-name:var(--font-cairo)]">رصيدك الحالي</p>
                       <p className="text-2xl font-bold text-[#FFD700] font-[family-name:var(--font-cairo)]">{coins.toLocaleString()}</p>
@@ -160,34 +181,43 @@ export default function TreasuresPage() {
                 </div>
              </header>
 
-             {/* Tabs */}
-             <div className="px-8 py-4 flex gap-4">
-                <button 
-                   onClick={() => setActiveTab('market')}
-                   className={cn(
-                      "px-6 py-2 rounded-full font-bold transition-all duration-300 flex items-center gap-2",
-                      activeTab === 'market' 
-                        ? "bg-[#DAA520] text-[#0a192f] shadow-[0_0_15px_rgba(218,165,32,0.4)]" 
-                        : "bg-[#2A1B0E] text-[#F4E4BC]/60 hover:text-[#F4E4BC] border border-[#5D4037]"
-                   )}
-                >
-                   <ShoppingBag className="w-4 h-4" /> السوق
-                </button>
-                <button 
-                   onClick={() => setActiveTab('inventory')}
-                   className={cn(
-                      "px-6 py-2 rounded-full font-bold transition-all duration-300 flex items-center gap-2",
-                      activeTab === 'inventory' 
-                        ? "bg-[#DAA520] text-[#0a192f] shadow-[0_0_15px_rgba(218,165,32,0.4)]" 
-                        : "bg-[#2A1B0E] text-[#F4E4BC]/60 hover:text-[#F4E4BC] border border-[#5D4037]"
-                   )}
-                >
-                   <Package className="w-4 h-4" /> مقتنياتي
-                </button>
-             </div>
+            {/* Main Board Frame */}
+            <div className="flex-1 bg-[#1E120A]/80 backdrop-blur-md rounded-[2rem] border-[3px] border-[#DAA520] shadow-[0_0_60px_rgba(0,0,0,0.6)] relative flex flex-col">
+                {/* Frame Decorations */}
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')] opacity-20 mix-blend-overlay pointer-events-none" />
+                <div className="absolute top-0 left-0 w-24 h-24 border-t-4 border-l-4 border-[#DAA520] rounded-tl-[1.5rem] opacity-60 pointer-events-none" />
+                <div className="absolute top-0 right-0 w-24 h-24 border-t-4 border-r-4 border-[#DAA520] rounded-tr-[1.5rem] opacity-60 pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-24 h-24 border-b-4 border-l-4 border-[#DAA520] rounded-bl-[1.5rem] opacity-60 pointer-events-none" />
+                <div className="absolute bottom-0 right-0 w-24 h-24 border-b-4 border-r-4 border-[#DAA520] rounded-br-[1.5rem] opacity-60 pointer-events-none" />
 
-             {/* Content */}
-             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                {/* Tabs */}
+                <div className="flex justify-center -mt-6 relative z-20 gap-4">
+                    <button 
+                       onClick={() => setActiveTab('market')}
+                       className={cn(
+                          "px-8 py-3 rounded-2xl font-bold transition-all duration-300 flex items-center gap-2 border-2 shadow-lg transform hover:-translate-y-1",
+                          activeTab === 'market' 
+                            ? "bg-gradient-to-b from-[#DAA520] to-[#B8860B] text-[#1E120A] border-[#FFD700]" 
+                            : "bg-[#2A1B0E] text-[#F4E4BC]/60 hover:text-[#F4E4BC] border-[#5D4037]"
+                       )}
+                    >
+                       <ShoppingBag className="w-5 h-5" /> السوق
+                    </button>
+                    <button 
+                       onClick={() => setActiveTab('inventory')}
+                       className={cn(
+                          "px-8 py-3 rounded-2xl font-bold transition-all duration-300 flex items-center gap-2 border-2 shadow-lg transform hover:-translate-y-1",
+                          activeTab === 'inventory' 
+                            ? "bg-gradient-to-b from-[#DAA520] to-[#B8860B] text-[#1E120A] border-[#FFD700]" 
+                            : "bg-[#2A1B0E] text-[#F4E4BC]/60 hover:text-[#F4E4BC] border-[#5D4037]"
+                       )}
+                    >
+                       <Package className="w-5 h-5" /> مقتنياتي
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-8 relative z-10">
                 <AnimatePresence mode="wait">
                    {activeTab === 'market' ? (
                       <motion.div 
@@ -206,8 +236,8 @@ export default function TreasuresPage() {
                                     alt={item.name} 
                                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                                   />
-                                  <div className={cn("absolute top-3 right-3 z-20 px-2 py-1 rounded text-xs font-bold border backdrop-blur-md uppercase tracking-wider", getRarityColor(item.rarity))}>
-                                     {item.rarity}
+                                  <div className={cn("absolute top-3 right-3 z-20 px-2 py-1 rounded text-xs font-bold border backdrop-blur-md tracking-wider", getRarityColor(item.rarity))}>
+                                     {getRarityText(item.rarity)}
                                   </div>
                                </div>
                                
@@ -258,7 +288,7 @@ export default function TreasuresPage() {
                                      </div>
                                      <div>
                                         <h4 className="font-bold text-[#F4E4BC]">{item.name}</h4>
-                                        <p className="text-[#F4E4BC]/50 text-xs mt-1">{item.type}</p>
+                                        <p className="text-[#F4E4BC]/50 text-xs mt-1">{getTypeText(item.type)}</p>
                                         <p className="text-[#DAA520] text-xs mt-2">{item.dateAcquired}</p>
                                      </div>
                                   </div>
@@ -270,6 +300,7 @@ export default function TreasuresPage() {
                 </AnimatePresence>
              </div>
 
+          </div>
           </div>
         </main>
       </PageTransition>

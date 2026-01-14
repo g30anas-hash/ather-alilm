@@ -9,21 +9,25 @@ interface GameCardProps {
   onClick?: () => void;
 }
 
-export default function GameCard({ children, className, title, onClick }: GameCardProps) {
+export default function GameCard({ title, children, className, action, headerIcon, onClick }: GameCardProps) {
   return (
     <div 
       onClick={onClick}
       className={cn(
-        "relative bg-[#F4E4BC] border-4 border-[#8B4513] rounded-xl shadow-2xl overflow-hidden",
-        "before:absolute before:inset-0 before:border-2 before:border-[#DAA520] before:rounded-lg before:pointer-events-none",
-        className
-      )}
-    >
-      {/* Corner Ornaments */}
-      <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-[#DAA520] rounded-tl-lg z-10" />
-      <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-[#DAA520] rounded-tr-lg z-10" />
-      <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-[#DAA520] rounded-bl-lg z-10" />
-      <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-[#DAA520] rounded-br-lg z-10" />
+      "relative p-6 rounded-xl transition-all duration-300 group",
+      // Base styles: Dark wood/glass fantasy theme instead of light paper
+      "bg-[#1E120A]/80 backdrop-blur-sm border-2 border-[#DAA520]", 
+      "shadow-[0_4px_20px_rgba(0,0,0,0.4)]",
+      "hover:shadow-[0_8px_30px_rgba(218,165,32,0.1)] hover:border-[#DAA520]",
+      className
+    )}>
+      {/* Corner Ornaments - Minimal & Clean */}
+      <div className="absolute top-0 left-0 w-6 h-6 border-t border-l border-[#DAA520]/50 rounded-tl-lg pointer-events-none" />
+      <div className="absolute top-0 right-0 w-6 h-6 border-t border-r border-[#DAA520]/50 rounded-tr-lg pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-6 h-6 border-b border-l border-[#DAA520]/50 rounded-bl-lg pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-6 h-6 border-b border-r border-[#DAA520]/50 rounded-br-lg pointer-events-none" />
+
+      {/* Header */}
 
       {title && (
         <div className="bg-[#5D4037] text-[#FFD700] py-2 px-6 text-center border-b-4 border-[#8B4513] relative z-20">

@@ -51,7 +51,8 @@ import {
   Sparkles,
   ShoppingBag,
   FileDown,
-  Printer
+  Printer,
+  ShieldAlert
 } from "lucide-react";
 import PageTransition from "@/components/PageTransition";
 import MobileNav from "@/components/MobileNav";
@@ -64,6 +65,7 @@ import NotificationCenter from "@/components/NotificationCenter";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import AtherMind from "@/components/AtherMind";
+import FantasyModal from "@/components/FantasyModal";
 
 // --- Helper Components ---
 
@@ -136,7 +138,7 @@ export default function LeadershipPalacePage() {
   const [editingClass, setEditingClass] = useState<ClassData | null>(null);
   const [classForm, setClassForm] = useState<{name: string, grade: string, capacity: number, teacherId: string}>({ name: "", grade: "", capacity: 30, teacherId: "" });
 
-  const { name, allUsers: users, classes, stages, addUser, removeUser, updateUser, addClass, removeClass, updateClass, addStage, removeStage, logout, quests, updateQuestStatus, supportMessages, marketItems, addMarketItem, removeMarketItem, behaviorRecords, processBehaviorRequest, markSupportMessageAsRead, broadcasts, sendBroadcast, schedule, addToSchedule, updateScheduleItem, removeScheduleItem, weeklyPlan, attendanceRecords, questionBank, addQuestion, updateQuestionStatus: updateBankQuestionStatus, deleteQuestion, competitions, addCompetition, submissions, mapNodes, addMapNode, updateMapNode, deleteMapNode, purchaseLogs } = useUser();
+  const { name, allUsers: users, classes, stages, addUser, removeUser, updateUser, addClass, removeClass, updateClass, addStage, removeStage, logout, quests, updateQuestStatus, supportMessages, marketItems, addMarketItem, removeMarketItem, behaviorRecords, processBehaviorRequest, markSupportMessageAsRead, broadcasts, sendBroadcast, updateBroadcast, deleteBroadcast, schedule, addToSchedule, updateScheduleItem, removeScheduleItem, weeklyPlan, attendanceRecords, questionBank, addQuestion, updateQuestionStatus: updateBankQuestionStatus, deleteQuestion, competitions, addCompetition, submissions, mapNodes, addMapNode, updateMapNode, deleteMapNode, purchaseLogs, lessons } = useUser();
   const { showToast } = useToast();
 
   // Knowledge Map States
@@ -526,22 +528,61 @@ export default function LeadershipPalacePage() {
   };
 
   const [activeMessageTab, setActiveMessageTab] = useState<'inbox' | 'compose' | 'history'>('inbox');
+  const [editingBroadcastId, setEditingBroadcastId] = useState<string | null>(null);
   const [broadcastForm, setBroadcastForm] = useState<{title: string, message: string, target: string, type: string}>({
       title: "", message: "", target: "all", type: "info"
   });
 
   const handleSendBroadcast = (e: React.FormEvent) => {
       e.preventDefault();
-      sendBroadcast({
-          senderName: name,
-          title: broadcastForm.title,
-          message: broadcastForm.message,
-          targetRole: broadcastForm.target as any,
-          type: broadcastForm.type as any
-      });
-      showToast("تم إصدار المرسوم وإرساله بنجاح", "success");
+      
+      // If editing
+      if (editingBroadcastId) {
+          const original = broadcasts.find(b => b.id === editingBroadcastId);
+          if (original) {
+              updateBroadcast({
+                  ...original,
+                  title: broadcastForm.title,
+                  message: broadcastForm.message,
+                  targetRole: broadcastForm.target as any,
+                  type: broadcastForm.type as any,
+                  senderName: "بوابة القصر" // Enforce sender name for updates too
+              });
+              showToast("تم تحديث المرسوم بنجاح", "success");
+          }
+      } else {
+          // New broadcast
+          sendBroadcast({
+              senderName: "بوابة القصر", // Use Palace Gate for Admin
+              title: broadcastForm.title,
+              message: broadcastForm.message,
+              targetRole: broadcastForm.target as any,
+              type: broadcastForm.type as any
+          });
+          showToast("تم إصدار المرسوم وإرساله بنجاح", "success");
+      }
+      
       setBroadcastForm({ title: "", message: "", target: "all", type: "info" });
+      setEditingBroadcastId(null);
       setActiveMessageTab('history');
+  };
+
+  const handleEditBroadcast = (broadcast: any) => {
+      setBroadcastForm({
+          title: broadcast.title,
+          message: broadcast.message,
+          target: broadcast.targetRole,
+          type: broadcast.type || 'info'
+      });
+      setEditingBroadcastId(broadcast.id);
+      setActiveMessageTab('compose');
+  };
+
+  const handleDeleteBroadcast = (id: string) => {
+      if (confirm("هل أنت متأكد من إلغاء هذا المرسوم؟")) {
+          deleteBroadcast(id);
+          showToast("تم إلغاء المرسوم", "info");
+      }
   };
 
   const handleLogout = () => {
@@ -716,8 +757,398 @@ export default function LeadershipPalacePage() {
     { id: 4, title: "التقرير المالي", type: "مالي", color: "bg-[#DAA520]/20 border-[#DAA520]", desc: "الميزانية المصروفة على الأنشطة والمكافآت." },
   ];
 
+  const [activeTab, setActiveTab] = useState('overview');
+
+  const teachers = users.filter(u => u.role === 'teacher');
+  const students = users.filter(u => u.role === 'student');
+
+  // Teacher Engagement Logic
+  const getTeacherEngagementStats = (teacherId: number) => {
+      // In a real app, we'd filter lessons by date = today
+      const today = new Date().toLocaleDateString('en-US'); // Simplified date matching
+      const todayLessons = lessons.filter(l => l.teacherId === teacherId); // Should filter by date
+      
+      const totalLessons = 5; // Assuming fixed 5 lessons per day per teacher for demo
+      const documentedLessons = todayLessons.length;
+      const incompleteLessons = Math.max(0, totalLessons - documentedLessons);
+      
+      // Calculate Score: +1 per lesson, -0.5 per delay/missing (simplified)
+      let score = documentedLessons * 1; 
+      if (incompleteLessons > 0) score -= (incompleteLessons * 0.5);
+
+      let status = 'neutral';
+      if (documentedLessons === totalLessons) status = 'active'; // Green
+      else if (documentedLessons > 0) status = 'partial'; // Yellow
+      else status = 'inactive'; // Red
+
+      return { totalLessons, documentedLessons, incompleteLessons, score, status };
+  };
+
+  const teacherEngagementData = teachers.map(t => {
+      const stats = getTeacherEngagementStats(t.id);
+      return { ...t, ...stats };
+  });
+
+  const [showSystemSettingsModal, setShowSystemSettingsModal] = useState(false);
+  const [systemSettings, setSystemSettings] = useState({
+      platformName: "أثير العلم",
+      academicYear: "1446-1447",
+      semester: "الفصل الدراسي الأول",
+      maintenanceMode: false,
+      allowRegistration: true,
+      themeColor: "#DAA520"
+  });
+
+  const handleSaveSystemSettings = (e: React.FormEvent) => {
+      e.preventDefault();
+      showToast("تم تحديث إعدادات المنصة بنجاح", "success");
+      setShowSystemSettingsModal(false);
+  };
+
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [editingRole, setEditingRole] = useState<any | null>(null);
+  const [roleForm, setRoleForm] = useState({ name: "", permissions: [] as string[] });
+  const [availableRoles, setAvailableRoles] = useState([
+      { id: 1, name: 'مدير النظام', permissions: ['all'] },
+      { id: 2, name: 'وكيل المدرسة', permissions: ['manage_users', 'view_reports'] },
+      { id: 3, name: 'رائد النشاط', permissions: ['manage_events', 'view_reports'] },
+      { id: 4, name: 'المرشد الطلابي', permissions: ['view_students', 'manage_behavior'] }
+  ]);
+
+  const allPermissions = [
+      { id: 'manage_users', label: 'إدارة المستخدمين' },
+      { id: 'view_reports', label: 'عرض التقارير' },
+      { id: 'manage_events', label: 'إدارة الأنشطة' },
+      { id: 'view_students', label: 'عرض بيانات الطلاب' },
+      { id: 'manage_behavior', label: 'إدارة السلوك' },
+      { id: 'manage_settings', label: 'إعدادات النظام' }
+  ];
+
+  const handleOpenRoleModal = (role?: any) => {
+      if (role) {
+          setEditingRole(role);
+          setRoleForm({ name: role.name, permissions: role.permissions });
+      } else {
+          setEditingRole(null);
+          setRoleForm({ name: "", permissions: [] });
+      }
+      setShowRoleModal(true);
+  };
+
+  const handleSaveRole = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (editingRole) {
+          setAvailableRoles(availableRoles.map(r => r.id === editingRole.id ? { ...r, ...roleForm } : r));
+          showToast("تم تحديث الدور بنجاح", "success");
+      } else {
+          setAvailableRoles([...availableRoles, { id: Date.now(), ...roleForm }]);
+          showToast("تم إضافة الدور الجديد", "success");
+      }
+      setShowRoleModal(false);
+  };
+
+  const handleDeleteRole = (id: number) => {
+      if (confirm("هل أنت متأكد من حذف هذا الدور؟")) {
+          setAvailableRoles(availableRoles.filter(r => r.id !== id));
+          showToast("تم حذف الدور", "info");
+      }
+  };
+
+  const togglePermission = (permId: string) => {
+      if (roleForm.permissions.includes(permId)) {
+          setRoleForm({ ...roleForm, permissions: roleForm.permissions.filter(p => p !== permId) });
+      } else {
+          setRoleForm({ ...roleForm, permissions: [...roleForm.permissions, permId] });
+      }
+  };
+
   const renderContent = () => {
     switch (activeView) {
+      case 'settings':
+        return (
+            <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 className="text-3xl text-[#FFD700] font-[family-name:var(--font-amiri)] font-bold">إعدادات القصر والمنصة</h2>
+                        <p className="text-[#F4E4BC]/60">التحكم الكامل في خصائص النظام وإعدادات العام الدراسي</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* General Settings Card */}
+                    <div className="bg-[#2A1B0E]/60 p-6 rounded-xl border border-[#5D4037]">
+                        <div className="flex items-center gap-3 mb-4 border-b border-[#5D4037] pb-2">
+                            <Settings className="w-6 h-6 text-[#DAA520]" />
+                            <h3 className="text-xl text-[#F4E4BC] font-bold">إعدادات عامة</h3>
+                        </div>
+                        <form onSubmit={handleSaveSystemSettings} className="space-y-4">
+                            <div>
+                                <label className="block text-[#F4E4BC] mb-2 text-sm">اسم المنصة</label>
+                                <input 
+                                    type="text" 
+                                    value={systemSettings.platformName}
+                                    onChange={(e) => setSystemSettings({...systemSettings, platformName: e.target.value})}
+                                    className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg p-2 text-[#F4E4BC] focus:border-[#DAA520] outline-none" 
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[#F4E4BC] mb-2 text-sm">العام الدراسي</label>
+                                    <input 
+                                        type="text" 
+                                        value={systemSettings.academicYear}
+                                        onChange={(e) => setSystemSettings({...systemSettings, academicYear: e.target.value})}
+                                        className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg p-2 text-[#F4E4BC] focus:border-[#DAA520] outline-none" 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[#F4E4BC] mb-2 text-sm">الفصل الدراسي</label>
+                                    <select 
+                                        value={systemSettings.semester}
+                                        onChange={(e) => setSystemSettings({...systemSettings, semester: e.target.value})}
+                                        className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg p-2 text-[#F4E4BC] focus:border-[#DAA520] outline-none"
+                                    >
+                                        <option>الفصل الدراسي الأول</option>
+                                        <option>الفصل الدراسي الثاني</option>
+                                        <option>الفصل الدراسي الثالث</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center justify-between p-3 bg-[#000]/20 rounded-lg border border-[#5D4037]/50">
+                                <span className="text-[#F4E4BC]">إتاحة التسجيل الجديد</span>
+                                <button 
+                                    type="button"
+                                    onClick={() => setSystemSettings({...systemSettings, allowRegistration: !systemSettings.allowRegistration})}
+                                    className={cn(
+                                        "w-12 h-6 rounded-full relative transition-colors",
+                                        systemSettings.allowRegistration ? "bg-[#4ECDC4]" : "bg-[#5D4037]"
+                                    )}
+                                >
+                                    <div className={cn(
+                                        "absolute top-1 w-4 h-4 rounded-full bg-white transition-all",
+                                        systemSettings.allowRegistration ? "left-7" : "left-1"
+                                    )} />
+                                </button>
+                            </div>
+
+                            <div className="flex items-center justify-between p-3 bg-[#000]/20 rounded-lg border border-[#5D4037]/50">
+                                <span className="text-[#F4E4BC]">وضع الصيانة</span>
+                                <button 
+                                    type="button"
+                                    onClick={() => setSystemSettings({...systemSettings, maintenanceMode: !systemSettings.maintenanceMode})}
+                                    className={cn(
+                                        "w-12 h-6 rounded-full relative transition-colors",
+                                        systemSettings.maintenanceMode ? "bg-[#FF6B6B]" : "bg-[#5D4037]"
+                                    )}
+                                >
+                                    <div className={cn(
+                                        "absolute top-1 w-4 h-4 rounded-full bg-white transition-all",
+                                        systemSettings.maintenanceMode ? "left-7" : "left-1"
+                                    )} />
+                                </button>
+                            </div>
+
+                            <GoldButton type="submit" fullWidth className="mt-4">
+                                حفظ الإعدادات
+                            </GoldButton>
+                        </form>
+                    </div>
+
+                    {/* Permissions & Roles */}
+                    <div className="bg-[#2A1B0E]/60 p-6 rounded-xl border border-[#5D4037]">
+                         <div className="flex items-center gap-3 mb-4 border-b border-[#5D4037] pb-2">
+                            <ShieldAlert className="w-6 h-6 text-[#FFD700]" />
+                            <h3 className="text-xl text-[#F4E4BC] font-bold">الصلاحيات والأدوار</h3>
+                        </div>
+                        <div className="space-y-3">
+                            {availableRoles.map((role, i) => (
+                                <div key={role.id} className="flex items-center justify-between p-3 bg-[#000]/20 rounded-lg border border-[#5D4037]/50 hover:border-[#DAA520] transition-colors group">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-[#DAA520]/10 flex items-center justify-center text-[#DAA520]">
+                                            <Users className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <div className="text-[#F4E4BC] font-bold">{role.name}</div>
+                                            <div className="text-[#F4E4BC]/40 text-xs">{role.permissions.length} صلاحيات</div>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => handleOpenRoleModal(role)} className="text-[#DAA520] hover:bg-[#DAA520]/20 p-1 rounded" title="تعديل"><Edit2 className="w-4 h-4" /></button>
+                                        <button onClick={() => handleDeleteRole(role.id)} className="text-[#FF6B6B] hover:bg-[#FF6B6B]/20 p-1 rounded" title="حذف"><Trash2 className="w-4 h-4" /></button>
+                                    </div>
+                                </div>
+                            ))}
+                            <button 
+                                onClick={() => handleOpenRoleModal()}
+                                className="w-full py-2 border border-dashed border-[#5D4037] text-[#F4E4BC]/50 rounded-lg hover:border-[#DAA520] hover:text-[#DAA520] transition-colors"
+                            >
+                                + إضافة دور جديد
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Role Modal */}
+                <AnimatePresence>
+                    {showRoleModal && (
+                        <FantasyModal onClose={() => setShowRoleModal(false)} title={editingRole ? "تعديل الدور" : "إضافة دور جديد"}>
+                            <form onSubmit={handleSaveRole} className="space-y-4">
+                                <div>
+                                    <label className="block text-[#F4E4BC] mb-2 font-[family-name:var(--font-cairo)]">اسم الدور</label>
+                                    <input 
+                                        type="text" 
+                                        required
+                                        value={roleForm.name}
+                                        onChange={(e) => setRoleForm({...roleForm, name: e.target.value})}
+                                        className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none" 
+                                        placeholder="مثال: مشرف تربوي" 
+                                    />
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-[#F4E4BC] mb-2 font-[family-name:var(--font-cairo)]">الصلاحيات الممنوحة</label>
+                                    <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto custom-scrollbar p-1">
+                                        {allPermissions.map(perm => (
+                                            <div 
+                                                key={perm.id}
+                                                onClick={() => togglePermission(perm.id)}
+                                                className={cn(
+                                                    "p-3 rounded border cursor-pointer transition-all flex items-center justify-between",
+                                                    roleForm.permissions.includes(perm.id) 
+                                                        ? "bg-[#DAA520]/20 border-[#DAA520]" 
+                                                        : "bg-[#000]/20 border-[#5D4037] hover:border-[#DAA520]/50"
+                                                )}
+                                            >
+                                                <span className={cn("text-sm", roleForm.permissions.includes(perm.id) ? "text-[#DAA520]" : "text-[#F4E4BC]/70")}>{perm.label}</span>
+                                                {roleForm.permissions.includes(perm.id) && <CheckCircle2 className="w-4 h-4 text-[#DAA520]" />}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 flex justify-end gap-3 border-t border-[#DAA520]/30 mt-2">
+                                    <button type="button" onClick={() => setShowRoleModal(false)} className="px-6 py-2 text-[#F4E4BC] hover:bg-[#5D4037]/50 rounded-lg transition-colors">إلغاء</button>
+                                    <GoldButton type="submit" className="px-8 shadow-[0_0_20px_rgba(218,165,32,0.4)]">
+                                         حفظ التغييرات
+                                    </GoldButton>
+                                </div>
+                            </form>
+                        </FantasyModal>
+                    )}
+                </AnimatePresence>
+            </div>
+        );
+
+      case 'engagement':
+        return (
+            <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 className="text-3xl text-[#FFD700] font-[family-name:var(--font-amiri)] font-bold">نظام المتابعة الذكي</h2>
+                        <p className="text-[#F4E4BC]/60">متابعة تفاعل المعلمين وتوثيق الحصص الدراسية يومياً</p>
+                    </div>
+                    <div className="flex gap-2">
+                         <GoldButton onClick={() => showToast("تم إرسال التقرير للإدارة العليا", "success")}>
+                            <Printer className="w-4 h-4 ml-2 inline" />
+                            طباعة التقرير
+                         </GoldButton>
+                         <GoldButton variant="secondary" onClick={() => showToast("تم إرسال تنبيهات للمعلمين غير المتفاعلين", "info")}>
+                            <Bell className="w-4 h-4 ml-2 inline" />
+                            تنبيه المتأخرين
+                         </GoldButton>
+                    </div>
+                </div>
+
+                {/* Engagement Dashboard Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                     <div className="bg-[#000]/30 p-6 rounded-xl border border-[#5D4037] flex flex-col items-center justify-center text-center">
+                         <div className="w-24 h-24 rounded-full border-4 border-[#4ECDC4] flex items-center justify-center text-3xl text-[#4ECDC4] font-bold mb-2">
+                             {teacherEngagementData.filter(t => t.status === 'active').length}
+                         </div>
+                         <h3 className="text-[#F4E4BC] font-bold">معلم متفاعل 🟢</h3>
+                         <p className="text-[#F4E4BC]/50 text-sm mt-1">أكملوا جميع الحصص</p>
+                     </div>
+                     <div className="bg-[#000]/30 p-6 rounded-xl border border-[#5D4037] flex flex-col items-center justify-center text-center">
+                         <div className="w-24 h-24 rounded-full border-4 border-[#FFD700] flex items-center justify-center text-3xl text-[#FFD700] font-bold mb-2">
+                             {teacherEngagementData.filter(t => t.status === 'partial').length}
+                         </div>
+                         <h3 className="text-[#F4E4BC] font-bold">تفاعل جزئي 🟡</h3>
+                         <p className="text-[#F4E4BC]/50 text-sm mt-1">أكملوا بعض الحصص</p>
+                     </div>
+                     <div className="bg-[#000]/30 p-6 rounded-xl border border-[#5D4037] flex flex-col items-center justify-center text-center">
+                         <div className="w-24 h-24 rounded-full border-4 border-[#FF6B6B] flex items-center justify-center text-3xl text-[#FF6B6B] font-bold mb-2">
+                             {teacherEngagementData.filter(t => t.status === 'inactive').length}
+                         </div>
+                         <h3 className="text-[#F4E4BC] font-bold">غير متفاعل 🔴</h3>
+                         <p className="text-[#F4E4BC]/50 text-sm mt-1">لم يوثقوا أي حصة</p>
+                     </div>
+                </div>
+
+                {/* Daily Report Table */}
+                <div className="bg-[#2A1B0E]/60 rounded-xl border border-[#5D4037] overflow-hidden">
+                    <div className="p-4 bg-[#000]/20 border-b border-[#5D4037] flex justify-between items-center">
+                        <h3 className="text-[#FFD700] font-bold flex items-center gap-2">
+                            <FileText className="w-5 h-5" />
+                            تقرير التفاعل اليومي
+                        </h3>
+                        <span className="text-[#F4E4BC]/40 text-sm">{new Date().toLocaleDateString('ar-SA')}</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-[#000]/30 text-[#F4E4BC]/60">
+                                <tr>
+                                    <th className="p-4 text-right">المعلم</th>
+                                    <th className="p-4 text-center">إجمالي الحصص</th>
+                                    <th className="p-4 text-center">المكتمل</th>
+                                    <th className="p-4 text-center">غير المكتمل</th>
+                                    <th className="p-4 text-center">نقاط التفاعل</th>
+                                    <th className="p-4 text-center">الحالة</th>
+                                    <th className="p-4 text-center">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#5D4037]/30">
+                                {teacherEngagementData.map(teacher => (
+                                    <tr key={teacher.id} className="hover:bg-[#DAA520]/5 transition-colors">
+                                        <td className="p-4 font-bold text-[#F4E4BC]">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-[#DAA520]/20 flex items-center justify-center text-[#DAA520]">
+                                                    {teacher.name[0]}
+                                                </div>
+                                                {teacher.name}
+                                            </div>
+                                        </td>
+                                        <td className="p-4 text-center text-[#F4E4BC]">{teacher.totalLessons}</td>
+                                        <td className="p-4 text-center text-[#4ECDC4] font-bold">{teacher.documentedLessons}</td>
+                                        <td className="p-4 text-center text-[#FF6B6B] font-bold">{teacher.incompleteLessons}</td>
+                                        <td className="p-4 text-center">
+                                            <span className="font-bold text-[#FFD700]">{teacher.score}</span>
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <span className={cn(
+                                                "px-3 py-1 rounded-full text-xs font-bold border",
+                                                teacher.status === 'active' ? "bg-[#4ECDC4]/10 text-[#4ECDC4] border-[#4ECDC4]/30" :
+                                                teacher.status === 'partial' ? "bg-[#FFD700]/10 text-[#FFD700] border-[#FFD700]/30" :
+                                                "bg-[#FF6B6B]/10 text-[#FF6B6B] border-[#FF6B6B]/30"
+                                            )}>
+                                                {teacher.status === 'active' ? '🟢 متفاعل' : teacher.status === 'partial' ? '🟡 جزئي' : '🔴 غير متفاعل'}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <div className="flex justify-center gap-2">
+                                                <button className="p-1 hover:bg-[#4ECDC4]/20 rounded text-[#4ECDC4]" title="إرسال شكر"><Sparkles className="w-4 h-4" /></button>
+                                                <button className="p-1 hover:bg-[#FF6B6B]/20 rounded text-[#FF6B6B]" title="إرسال تنبيه"><Bell className="w-4 h-4" /></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        );
+
       case 'home':
         return (
           <div className="space-y-6">
@@ -1363,7 +1794,9 @@ export default function LeadershipPalacePage() {
                         <div className="relative z-10">
                             <div className="text-center mb-6 border-b-2 border-[#2A1B0E]/20 pb-4">
                                 <Crown className="w-12 h-12 mx-auto text-[#DAA520] mb-2" />
-                                <h2 className="text-3xl font-[family-name:var(--font-amiri)] font-bold text-[#2A1B0E]">مرسوم ملكي</h2>
+                                <h2 className="text-3xl font-[family-name:var(--font-amiri)] font-bold text-[#2A1B0E]">
+                                    {editingBroadcastId ? "تعديل المرسوم" : "مرسوم ملكي"}
+                                </h2>
                                 <p className="text-[#2A1B0E]/60 text-sm">من مكتب قيادة المملكة</p>
                             </div>
 
@@ -1420,13 +1853,26 @@ export default function LeadershipPalacePage() {
                                     ></textarea>
                                 </div>
 
-                                <div className="flex justify-end pt-4">
+                                <div className="flex justify-end pt-4 gap-3">
+                                    {editingBroadcastId && (
+                                        <button 
+                                            type="button"
+                                            onClick={() => {
+                                                setEditingBroadcastId(null);
+                                                setBroadcastForm({ title: "", message: "", target: "all", type: "info" });
+                                                setActiveMessageTab('history');
+                                            }}
+                                            className="bg-transparent border border-[#2A1B0E]/30 text-[#2A1B0E] px-6 py-3 rounded-full font-bold hover:bg-[#2A1B0E]/5"
+                                        >
+                                            إلغاء
+                                        </button>
+                                    )}
                                     <button 
                                         type="submit" 
                                         className="bg-[#2A1B0E] text-[#FFD700] px-8 py-3 rounded-full font-bold flex items-center gap-2 hover:bg-[#2A1B0E]/90 transition-transform hover:scale-105 shadow-lg"
                                     >
                                         <Send className="w-5 h-5" />
-                                        إصدار المرسوم
+                                        {editingBroadcastId ? "تحديث المرسوم" : "إصدار المرسوم"}
                                     </button>
                                 </div>
                             </form>
@@ -1444,7 +1890,7 @@ export default function LeadershipPalacePage() {
                           </div>
                       ) : (
                           broadcasts.map(msg => (
-                              <div key={msg.id} className="bg-[#2A1B0E]/60 p-6 rounded-xl border border-[#DAA520]/30 flex gap-4">
+                              <div key={msg.id} className="bg-[#2A1B0E]/60 p-6 rounded-xl border border-[#DAA520]/30 flex gap-4 group hover:border-[#DAA520] transition-colors">
                                   <div className={cn(
                                       "p-3 rounded-full h-fit",
                                       msg.type === 'urgent' ? "bg-[#FF6B6B]/20" : 
@@ -1460,10 +1906,33 @@ export default function LeadershipPalacePage() {
                                   </div>
                                   <div className="flex-1">
                                       <div className="flex justify-between items-start mb-2">
-                                          <h4 className="text-xl text-[#FFD700] font-[family-name:var(--font-amiri)] font-bold">
-                                              {msg.type === 'urgent' && "🚨 "}{msg.title}
-                                          </h4>
-                                          <span className="text-[#F4E4BC]/40 text-xs bg-[#000]/20 px-2 py-1 rounded">{msg.date}</span>
+                                          <div>
+                                              <h4 className="text-xl text-[#FFD700] font-[family-name:var(--font-amiri)] font-bold">
+                                                  {msg.type === 'urgent' && "🚨 "}{msg.title}
+                                              </h4>
+                                              <span className="text-[#F4E4BC]/50 text-xs block mt-1">
+                                                  من: {msg.senderName || 'بوابة القصر'}
+                                              </span>
+                                          </div>
+                                          <div className="flex flex-col items-end gap-2">
+                                              <span className="text-[#F4E4BC]/40 text-xs bg-[#000]/20 px-2 py-1 rounded">{msg.date}</span>
+                                              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                  <button 
+                                                      onClick={() => handleEditBroadcast(msg)}
+                                                      className="p-1.5 text-[#4ECDC4] hover:bg-[#4ECDC4]/10 rounded"
+                                                      title="تعديل"
+                                                  >
+                                                      <Edit2 className="w-4 h-4" />
+                                                  </button>
+                                                  <button 
+                                                      onClick={() => handleDeleteBroadcast(msg.id)}
+                                                      className="p-1.5 text-[#FF6B6B] hover:bg-[#FF6B6B]/10 rounded"
+                                                      title="حذف"
+                                                  >
+                                                      <Trash2 className="w-4 h-4" />
+                                                  </button>
+                                              </div>
+                                          </div>
                                       </div>
                                       <p className="text-[#F4E4BC]/80 mb-3">{msg.message}</p>
                                       <div className="flex items-center gap-2 text-xs text-[#F4E4BC]/50">
@@ -2593,7 +3062,10 @@ export default function LeadershipPalacePage() {
                 </nav>
 
                 <div className="p-4 border-t border-[#DAA520]/30">
-                    <div className="flex items-center gap-3 mb-4">
+                    <div 
+                        className="flex items-center gap-3 mb-4 cursor-pointer hover:bg-[#DAA520]/10 p-2 rounded-lg transition-colors"
+                        onClick={() => setShowProfileModal(true)}
+                    >
                         <div className="w-10 h-10 rounded-full bg-[#DAA520] flex items-center justify-center text-[#2A1B0E] font-bold">
                             {name.charAt(0)}
                         </div>
@@ -2656,33 +3128,13 @@ export default function LeadershipPalacePage() {
       {/* Add User Modal */}
       <AnimatePresence>
         {showAddUserModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-                <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-                    onClick={() => setShowAddUserModal(false)}
-                />
-                
-                <motion.div
-                    initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                    animate={{ scale: 1, opacity: 1, y: 0 }}
-                    exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                    className="relative z-50 bg-[#2A1B0E] border-2 border-[#DAA520] p-8 rounded-2xl max-w-lg w-full shadow-2xl"
-                >
-                    <div className="flex justify-between items-center mb-6 border-b border-[#5D4037] pb-4">
-                        <h2 className="text-2xl text-[#FFD700] font-[family-name:var(--font-amiri)]">
-                            {editingUser 
-                                ? `تعديل بيانات ${activeUserTab === 'student' ? 'الطالب' : activeUserTab === 'teacher' ? 'المعلم' : 'ولي الأمر'}`
-                                : `إضافة ${activeUserTab === 'student' ? 'طالب' : activeUserTab === 'teacher' ? 'معلم' : 'ولي أمر'} جديد`
-                            }
-                        </h2>
-                        <button onClick={() => setShowAddUserModal(false)} className="text-[#F4E4BC] hover:text-[#FF6B6B]">
-                            <X className="w-6 h-6" />
-                        </button>
-                    </div>
-
+            <FantasyModal 
+                onClose={() => setShowAddUserModal(false)}
+                title={editingUser 
+                    ? `تعديل بيانات ${activeUserTab === 'student' ? 'الطالب' : activeUserTab === 'teacher' ? 'المعلم' : 'ولي الأمر'}`
+                    : `إضافة ${activeUserTab === 'student' ? 'طالب' : activeUserTab === 'teacher' ? 'معلم' : 'ولي أمر'} جديد`
+                }
+            >
                     <form onSubmit={handleSaveUser} className="space-y-4">
                         {editingUser && (
                             <div>
@@ -2821,38 +3273,17 @@ export default function LeadershipPalacePage() {
                             </GoldButton>
                         </div>
                     </form>
-                </motion.div>
-            </div>
+            </FantasyModal>
         )}
       </AnimatePresence>
 
       {/* Class Modal */}
       <AnimatePresence>
         {showClassModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-                <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-                    onClick={() => setShowClassModal(false)}
-                />
-                
-                <motion.div
-                    initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                    animate={{ scale: 1, opacity: 1, y: 0 }}
-                    exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                    className="relative z-50 bg-[#2A1B0E] border-2 border-[#DAA520] p-8 rounded-2xl max-w-lg w-full shadow-2xl"
-                >
-                    <div className="flex justify-between items-center mb-6 border-b border-[#5D4037] pb-4">
-                        <h2 className="text-2xl text-[#FFD700] font-[family-name:var(--font-amiri)]">
-                            {editingClass ? "تعديل الفصل" : "إضافة فصل جديد"}
-                        </h2>
-                        <button onClick={() => setShowClassModal(false)} className="text-[#F4E4BC] hover:text-[#FF6B6B]">
-                            <X className="w-6 h-6" />
-                        </button>
-                    </div>
-
+            <FantasyModal
+                onClose={() => setShowClassModal(false)}
+                title={editingClass ? "تعديل الفصل" : "إضافة فصل جديد"}
+            >
                     <form onSubmit={handleSaveClass} className="space-y-4">
                         <div>
                              <label className="block text-[#F4E4BC] mb-2 font-[family-name:var(--font-cairo)]">اسم الفصل</label>
@@ -2910,36 +3341,17 @@ export default function LeadershipPalacePage() {
                             </GoldButton>
                         </div>
                     </form>
-                </motion.div>
-            </div>
+            </FantasyModal>
         )}
       </AnimatePresence>
 
       {/* Stage Modal */}
       <AnimatePresence>
         {showStageModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-                <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-                    onClick={() => setShowStageModal(false)}
-                />
-                
-                <motion.div
-                    initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                    animate={{ scale: 1, opacity: 1, y: 0 }}
-                    exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                    className="relative z-50 bg-[#2A1B0E] border-2 border-[#DAA520] p-8 rounded-2xl max-w-lg w-full shadow-2xl"
-                >
-                    <div className="flex justify-between items-center mb-6 border-b border-[#5D4037] pb-4">
-                        <h2 className="text-2xl text-[#FFD700] font-[family-name:var(--font-amiri)]">إدارة المراحل الدراسية</h2>
-                        <button onClick={() => setShowStageModal(false)} className="text-[#F4E4BC] hover:text-[#FF6B6B]">
-                            <X className="w-6 h-6" />
-                        </button>
-                    </div>
-
+            <FantasyModal
+                onClose={() => setShowStageModal(false)}
+                title="إدارة المراحل الدراسية"
+            >
                     <div className="space-y-4">
                         <div className="flex gap-2">
                             <input 
@@ -2991,8 +3403,7 @@ export default function LeadershipPalacePage() {
                             إغلاق
                         </GoldButton>
                     </div>
-                </motion.div>
-            </div>
+            </FantasyModal>
         )}
       </AnimatePresence>
 
@@ -3228,6 +3639,22 @@ export default function LeadershipPalacePage() {
                                 className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none" 
                                 placeholder="مثال: سيف العدالة"
                              />
+                        </div>
+
+                        <div>
+                             <label className="block text-[#F4E4BC] mb-2 text-sm">رابط الصورة</label>
+                             <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    value={marketItemForm.image}
+                                    onChange={e => setMarketItemForm({...marketItemForm, image: e.target.value})}
+                                    className="flex-1 bg-[#000]/30 border border-[#5D4037] rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none text-xs" 
+                                    placeholder="https://..."
+                                />
+                                <div className="w-12 h-12 rounded-lg border border-[#5D4037] bg-[#000]/50 overflow-hidden shrink-0">
+                                    {marketItemForm.image && <img src={marketItemForm.image} alt="Preview" className="w-full h-full object-cover" />}
+                                </div>
+                             </div>
                         </div>
                         
                         <div>

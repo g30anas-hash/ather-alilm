@@ -14,6 +14,7 @@ export interface UserData {
   coins?: number;
   xp?: number;
   level?: number;
+  badges?: Badge[];
   // Student Specific
   parentId?: number | null;
   classId?: string | null;
@@ -76,12 +77,14 @@ export interface Quest {
 export interface SupportMessage {
   id: string;
   senderName: string;
-  mobile: string;
-  email: string;
+  mobile?: string;
+  email?: string;
   type: string;
   message: string;
   date: string;
   read: boolean;
+  senderId?: number;
+  targetId?: number;
 }
 
 export interface InventoryItem {
@@ -204,6 +207,21 @@ export interface Competition {
     createdBy: number; // Admin ID
 }
 
+export interface Lesson {
+  id: string;
+  teacherId: number;
+  teacherName: string;
+  classId: string;
+  className: string;
+  subject: string;
+  date: string;
+  summary: string;
+  imageUrl?: string;
+  attendees: number[]; // student IDs
+  questions: Question[];
+  createdAt: string;
+}
+
 export interface MapNode {
   id: string;
   title: string;
@@ -239,6 +257,7 @@ export interface PurchaseLog {
 }
 
 interface UserState {
+  id?: number;
   role: UserRole | null;
   name: string;
   coins: number;
@@ -265,6 +284,7 @@ interface UserState {
   competitions: Competition[];
   mapNodes: MapNode[];
   purchaseLogs: PurchaseLog[];
+  lessons: Lesson[];
 }
 
 interface UserContextType extends UserState {
@@ -299,6 +319,8 @@ interface UserContextType extends UserState {
   addBehaviorRequest: (record: Omit<BehaviorRecord, 'id' | 'status' | 'date'>) => void;
   processBehaviorRequest: (id: string, status: 'approved' | 'rejected') => void;
   sendBroadcast: (broadcast: Omit<BroadcastMessage, 'id' | 'date'>) => void;
+  updateBroadcast: (broadcast: BroadcastMessage) => void;
+  deleteBroadcast: (id: string) => void;
   markSupportMessageAsRead: (id: string) => void;
   addToSchedule: (item: Omit<ScheduleItem, 'id'>) => void;
   updateScheduleItem: (item: ScheduleItem) => void;
@@ -320,13 +342,16 @@ interface UserContextType extends UserState {
   updateMapNode: (node: MapNode) => void;
   deleteMapNode: (id: string) => void;
   recordPurchase: (log: Omit<PurchaseLog, 'id' | 'date'>) => void;
+  addLesson: (lesson: Omit<Lesson, 'id' | 'teacherId' | 'teacherName' | 'createdAt'>) => void;
   allUsers: UserData[]; // Explicitly export allUsers for Login check
+  demoLogin: (email: string) => boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<UserState>({
+    id: undefined,
     role: null,
     name: "طالب العلم",
     coins: 2450,
@@ -351,7 +376,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     questionBank: [],
     competitions: [],
     mapNodes: [],
-    purchaseLogs: []
+    purchaseLogs: [],
+    lessons: []
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -371,7 +397,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           { data: competitions },
           { data: schedule },
           { data: marketItems },
-          { data: purchaseLogs }
+          { data: purchaseLogs },
+          { data: supportMessages },
+          { data: lessons }
         ] = await Promise.all([
           supabase.from('users').select('*'),
           supabase.from('classes').select('*'),
@@ -383,7 +411,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           supabase.from('competitions').select('*'),
           supabase.from('schedule').select('*'),
           supabase.from('market_items').select('*'),
-          supabase.from('purchase_logs').select('*')
+          supabase.from('purchase_logs').select('*'),
+          supabase.from('support_messages').select('*'),
+          supabase.from('lessons').select('*')
         ]);
 
         // Map DB types to Frontend types
@@ -457,6 +487,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             itemName: l.item_name
         }));
 
+        const mappedSupportMessages = (supportMessages || []).map((m: any) => ({
+            ...m,
+            senderName: m.sender_name,
+            senderId: m.sender_id,
+            targetId: m.target_id
+        }));
+
+        const mappedLessons = (lessons || []).map((l: any) => ({
+            ...l,
+            teacherId: l.teacher_id,
+            teacherName: l.teacher_name,
+            classId: l.class_id,
+            className: l.class_name,
+            imageUrl: l.image_url,
+            createdAt: l.created_at
+        }));
+
         setState(prev => ({
           ...prev,
           allUsers: mappedUsers,
@@ -469,7 +516,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           competitions: mappedCompetitions,
           schedule: mappedSchedule,
           marketItems: mappedMarketItems,
-          purchaseLogs: mappedPurchaseLogs
+          purchaseLogs: mappedPurchaseLogs,
+          supportMessages: mappedSupportMessages,
+          lessons: mappedLessons
         }));
 
         // Auth State Listener
@@ -490,6 +539,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
                      
                      setState(prev => ({ 
                         ...prev, 
+                        id: mappedUser.id,
                         role: mappedUser.role, 
                         name: mappedUser.name, 
                         coins: mappedUser.coins, 
@@ -528,31 +578,49 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         b.targetRole === 'all' || b.targetRole === state.role
       );
 
-      const newNotifications: Notification[] = [];
+      let hasChanges = false;
       
-      relevantBroadcasts.forEach(b => {
-        const broadcastNotifId = `broadcast_${b.id}`;
-        const exists = state.notifications.some(n => n.id === broadcastNotifId);
-        
-        if (!exists) {
-           newNotifications.push({
-             id: broadcastNotifId,
+      // Keep non-broadcast notifications
+      const otherNotifications = state.notifications.filter(n => !n.id.startsWith('broadcast_'));
+      
+      // Process broadcasts to generate notifications
+      const broadcastNotifications = relevantBroadcasts.map(b => {
+          const id = `broadcast_${b.id}`;
+          const existing = state.notifications.find(n => n.id === id);
+          
+          const newNotif: Notification = {
+             id,
              title: b.type === 'urgent' ? `🚨 مرسوم عاجل: ${b.title}` : `📜 مرسوم ملكي: ${b.title}`,
              message: b.message,
              date: b.date ? new Date(b.date).toLocaleDateString('ar-SA') : 'الآن',
-             read: false,
+             read: existing ? existing.read : false, // Preserve read status
              type: b.type === 'urgent' ? 'warning' : (b.type as any) || 'info'
-           });
-        }
+          };
+          
+          // Check if content changed (ignore read status change as it's preserved)
+          if (!existing || 
+              existing.title !== newNotif.title || 
+              existing.message !== newNotif.message ||
+              existing.type !== newNotif.type) {
+              hasChanges = true;
+          }
+          
+          return newNotif;
       });
 
-      if (newNotifications.length > 0) {
-        setState(prev => ({
-          ...prev,
-          notifications: [...newNotifications, ...prev.notifications]
-        }));
-        // Note: We don't save broadcast notifications to DB permanently here to avoid duplication,
-        // or we could but filtered. For now, generated on fly is fine.
+      // Check if any were removed (count mismatch)
+      const oldBroadcastNotifsCount = state.notifications.length - otherNotifications.length;
+      if (oldBroadcastNotifsCount !== broadcastNotifications.length) {
+          hasChanges = true;
+      }
+
+      if (hasChanges) {
+          // Merge: Broadcasts first (usually newer or important), then others
+          // Ideally we should sort by date, but for now this ensures broadcasts are visible
+          setState(prev => ({
+              ...prev,
+              notifications: [...broadcastNotifications, ...otherNotifications]
+          }));
       }
     }
   }, [state.broadcasts, state.role, state.notifications]);
@@ -564,12 +632,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateName = async (name: string) => {
+    const id = getCurrentUserId();
     setState(prev => ({ ...prev, name }));
-    // Update in DB if we have a current user ID (need to track current user ID in state)
+    
+    if (id) {
+        await supabase.from('users').update({ name }).eq('id', id);
+        
+        // Also update allUsers to keep it consistent
+        setState(prev => ({
+            ...prev,
+            allUsers: prev.allUsers.map(u => u.id === id ? { ...u, name } : u)
+        }));
+    }
   };
 
   // Helper to get current user ID (assuming name is unique for this demo or we should store ID)
   const getCurrentUserId = () => {
+      if (state.id) return state.id;
       const user = state.allUsers.find(u => u.name === state.name && u.role === state.role);
       return user?.id;
   };
@@ -807,6 +886,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const newQuest = { ...quest, status: 'pending' };
     setState(prev => ({ ...prev, quests: [...prev.quests, newQuest as Quest] }));
     await supabase.from('quests').insert([newQuest]);
+    
+    // Teacher Reward for Adding Quest
+    if (state.role === 'teacher') {
+        addCoins(20);
+        addXP(50);
+    }
   };
 
   const updateQuestStatus = async (questId: number, status: 'approved' | 'rejected') => {
@@ -830,7 +915,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         mobile: msg.mobile,
         email: msg.email,
         type: msg.type,
-        message: msg.message
+        message: msg.message,
+        sender_id: msg.senderId,
+        target_id: msg.targetId
     }]);
   };
 
@@ -881,6 +968,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       };
 
       await supabase.from('behaviors').insert([dbRecord]);
+
+      // Teacher Reward for Engagement
+      if (state.role === 'teacher') {
+          addCoins(5);
+          addXP(10);
+      }
   };
 
   const processBehaviorRequest = async (id: string, status: 'approved' | 'rejected') => {
@@ -937,6 +1030,29 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         target_role: broadcast.targetRole,
         type: broadcast.type
     }]);
+  };
+
+  const updateBroadcast = async (broadcast: BroadcastMessage) => {
+    setState(prev => ({
+        ...prev,
+        broadcasts: prev.broadcasts.map(b => b.id === broadcast.id ? broadcast : b)
+    }));
+    
+    await supabase.from('broadcasts').update({
+        sender_name: broadcast.senderName,
+        title: broadcast.title,
+        message: broadcast.message,
+        target_role: broadcast.targetRole,
+        type: broadcast.type
+    }).eq('id', broadcast.id);
+  };
+
+  const deleteBroadcast = async (id: string) => {
+    setState(prev => ({
+        ...prev,
+        broadcasts: prev.broadcasts.filter(b => b.id !== id)
+    }));
+    await supabase.from('broadcasts').delete().eq('id', id);
   };
 
   const markSupportMessageAsRead = (id: string) => {
@@ -1046,6 +1162,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
               ...prev,
               questionBank: [...prev.questionBank, newQuestion]
           }));
+
+          // Teacher Reward
+          if (state.role === 'teacher') {
+              addCoins(10);
+              addXP(20);
+          }
       }
   };
 
@@ -1113,6 +1235,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
               ...prev,
               competitions: [...prev.competitions, newComp]
           }));
+
+          // Teacher Reward
+          if (state.role === 'teacher') {
+              addCoins(50);
+              addXP(100);
+          }
       }
   };
 
@@ -1166,6 +1294,65 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     await supabase.from('map_nodes').delete().eq('id', id);
   };
 
+  const demoLogin = (email: string) => {
+      let user = state.allUsers.find(u => u.email === email);
+      
+      // Fallback hardcoded users if DB fetch failed or empty
+      if (!user) {
+          const mockUsers: UserData[] = [
+              { id: 1, name: 'الطالب المغامر', email: 'student@ather.com', role: 'student', coins: 100, xp: 0, level: 1, classId: '1-A' },
+              { id: 2, name: 'المعلم الحكيم', email: 'teacher@ather.com', role: 'teacher', coins: 500, xp: 1000, level: 10, subject: 'العلوم' },
+              { id: 3, name: 'القائد الملهم', email: 'admin@ather.com', role: 'leader', coins: 99999, xp: 9999, level: 99 },
+              { id: 4, name: 'ولي الأمر الداعم', email: 'parent@ather.com', role: 'parent', coins: 0, xp: 0, level: 1, childrenIds: [1] }
+          ];
+          user = mockUsers.find(u => u.email === email);
+      }
+
+      if (user) {
+          setState(prev => ({
+              ...prev,
+              id: user!.id,
+              role: user!.role,
+              name: user!.name,
+              coins: user!.coins || 0,
+              xp: user!.xp || 0,
+              level: user!.level || 1,
+              classId: user!.classId, // Pass classId
+              subject: user!.subject, // Pass subject
+              childrenIds: user!.childrenIds, // Pass childrenIds
+              badges: [], 
+              inventory: [],
+              notifications: [],
+              acceptedQuests: []
+          }));
+          
+          // Simulate Daily Login Bonus for Teacher
+          if (user.role === 'teacher') {
+             // In real app, check last login date. For demo, just add it.
+             // We can't call addCoins/addXP immediately because state update is async/batched 
+             // and depends on 'prev'. But here we are setting state. 
+             // So we just assume we'll trigger it separately or just add to the initial state if needed.
+             // Better: Trigger a separate effect or just console log for now as state isn't ready.
+             // Actually, we can just update the DB here if we wanted.
+             // For this task, I'll skip adding it inside demoLogin to avoid race conditions with setState
+             // and instead rely on the user manually "Logging in" triggering an effect in the Page if I wanted.
+             // But simplest is:
+             setTimeout(() => {
+                 // Check if still logged in as teacher
+                 // addCoins(5);
+                 // addXP(10);
+                 // We need to access the function from context, but we are INSIDE context provider.
+                 // We can call the internal functions.
+                 // However, state is stale inside this closure if we used 'user' var.
+                 // Let's just update the DB directly for the user so next fetch gets it?
+                 // No, local state matters.
+             }, 1000);
+          }
+          return true;
+      }
+      return false;
+  };
+
   const recordPurchase = async (log: Omit<PurchaseLog, 'id' | 'date'>) => {
       const newLog: PurchaseLog = {
           ...log,
@@ -1185,6 +1372,59 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }]);
   };
 
+  const addLesson = async (lesson: Omit<Lesson, 'id' | 'teacherId' | 'teacherName' | 'createdAt'>) => {
+    const teacherId = getCurrentUserId();
+    const teacherName = state.name; // Assuming current user is teacher
+    if (!teacherId) return;
+
+    const dbLesson = {
+        teacher_id: teacherId,
+        teacher_name: teacherName,
+        class_id: lesson.classId,
+        class_name: lesson.className,
+        subject: lesson.subject,
+        date: lesson.date,
+        summary: lesson.summary,
+        image_url: lesson.imageUrl,
+        attendees: lesson.attendees,
+        questions: lesson.questions,
+        created_at: new Date().toISOString()
+    };
+
+    let createdLesson = null;
+    const { data } = await supabase.from('lessons').insert([dbLesson]).select();
+
+    if (data) {
+        createdLesson = {
+            ...lesson,
+            id: data[0].id,
+            teacherId: teacherId,
+            teacherName: teacherName,
+            createdAt: data[0].created_at
+        };
+    } else {
+        // Fallback for offline/mock mode
+        createdLesson = {
+            ...lesson,
+            id: Date.now().toString(),
+            teacherId: teacherId,
+            teacherName: teacherName,
+            createdAt: new Date().toISOString()
+        };
+    }
+
+    if (createdLesson) {
+        setState(prev => ({
+            ...prev,
+            lessons: [createdLesson!, ...prev.lessons]
+        }));
+        
+        // Also Add XP/Gold for the teacher for documenting
+        addCoins(15);
+        addXP(30);
+    }
+  };
+
   const getDashboardPath = () => {
     switch (state.role) {
       case 'student': return '/student-city';
@@ -1196,7 +1436,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <UserContext.Provider value={{ ...state, setRole, updateName, addCoins, addXP, spendCoins, acceptQuest, earnBadge, getDashboardPath, markNotificationAsRead, addNotification, submitQuest, gradeQuest, addUser, removeUser, updateUser, addClass, removeClass, updateClass, addStage, removeStage, logout, addQuest, updateQuestStatus, addSupportMessage, addItemToInventory, addMarketItem, removeMarketItem, addBehaviorRequest, processBehaviorRequest, sendBroadcast, markSupportMessageAsRead, addToSchedule, updateScheduleItem, removeScheduleItem, addToWeeklyPlan, markAttendance, addQuestion, updateQuestionStatus: updateQuestionStatus as any, updateQuestion, deleteQuestion, addCompetition, joinCompetition, submitCompetitionResult, updateCompetitionStatus, addMapNode, updateMapNode, deleteMapNode, recordPurchase }}>
+    <UserContext.Provider value={{ ...state, setRole, updateName, addCoins, addXP, spendCoins, acceptQuest, earnBadge, getDashboardPath, markNotificationAsRead, addNotification, submitQuest, gradeQuest, addUser, removeUser, updateUser, addClass, removeClass, updateClass, addStage, removeStage, logout, addQuest, updateQuestStatus, addSupportMessage, addItemToInventory, addMarketItem, removeMarketItem, addBehaviorRequest, processBehaviorRequest, sendBroadcast, updateBroadcast, deleteBroadcast, markSupportMessageAsRead, addToSchedule, updateScheduleItem, removeScheduleItem, addToWeeklyPlan, markAttendance, addQuestion, updateQuestionStatus: updateQuestionStatus as any, updateQuestion, deleteQuestion, addCompetition, joinCompetition, submitCompetitionResult, updateCompetitionStatus, addMapNode, updateMapNode, deleteMapNode, recordPurchase, addLesson, demoLogin }}>
       {children}
     </UserContext.Provider>
   );

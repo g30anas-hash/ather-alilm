@@ -118,7 +118,9 @@ export default function KnowledgeMapsPage() {
     <>
       <MobileNav />
       <PageTransition>
-        <main className="min-h-screen bg-[#0a192f] flex overflow-hidden relative">
+        <main className="min-h-screen bg-[url('https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=2674&auto=format&fit=crop')] bg-cover bg-center flex overflow-hidden relative">
+           {/* Atmospheric Overlays */}
+           <div className="absolute inset-0 bg-[#1E120A]/90 mix-blend-multiply z-0 pointer-events-none" />
           
           {/* Quiz Overlay */}
           <AnimatePresence>
@@ -127,7 +129,7 @@ export default function KnowledgeMapsPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 z-50 bg-[#0a192f]/95 backdrop-blur-xl flex flex-col items-center justify-center p-4"
+                className="absolute inset-0 z-50 bg-[#1E120A]/95 backdrop-blur-xl flex flex-col items-center justify-center p-4"
               >
                 {!showResults ? (
                   <div className="w-full max-w-2xl">
@@ -211,11 +213,11 @@ export default function KnowledgeMapsPage() {
 
           <div className="flex-1 relative overflow-hidden">
             {/* Map Background - Interactive Area */}
-            <div className="absolute inset-0 bg-[#1a2c4e] overflow-auto custom-scrollbar">
+            <div className="absolute inset-0 bg-[#150c05] overflow-auto custom-scrollbar">
                 {/* Background Image/Texture */}
                 <div 
                     className="min-w-[150%] min-h-[150%] relative bg-[url('https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=2674&auto=format&fit=crop')] bg-cover bg-center"
-                    style={{ filter: "sepia(0.4) hue-rotate(-30deg) brightness(0.7)" }}
+                    style={{ filter: "sepia(0.6) brightness(0.6) contrast(1.2)" }}
                 >
                     {/* Connection Lines (SVG) */}
                     <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">

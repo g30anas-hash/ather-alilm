@@ -36,7 +36,10 @@ import {
   Mail,
   Smartphone,
   Brain,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Crown,
+  ScrollText,
+  Trophy
 } from "lucide-react";
 import PageTransition from "@/components/PageTransition";
 import MobileNav from "@/components/MobileNav";
@@ -48,6 +51,7 @@ import ProfileModal from "@/components/ProfileModal";
 import NotificationCenter from "@/components/NotificationCenter";
 import { useRouter, useSearchParams } from "next/navigation";
 import AtherMind from "@/components/AtherMind";
+import FantasyModal from "@/components/FantasyModal";
 
 // --- Helper Components ---
 
@@ -101,7 +105,9 @@ function TeacherHallPageInner() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showBehaviorModal, setShowBehaviorModal] = useState(false);
-  const { name, submissions, gradeQuest, allUsers, classes, logout, addQuest, role, acceptedQuests, acceptQuest, addCoins, submitQuest, quests, addBehaviorRequest, supportMessages, markSupportMessageAsRead, addToSchedule, addToWeeklyPlan, schedule, weeklyPlan, addQuestion, questionBank, behaviorRecords } = useUser();
+  const [selectedBroadcast, setSelectedBroadcast] = useState<any>(null);
+  const [activeMessageTab, setActiveMessageTab] = useState<'all' | 'students' | 'parents' | 'admin' | 'broadcasts'>('all');
+  const { id, name, submissions, gradeQuest, allUsers, classes, logout, addQuest, role, acceptedQuests, acceptQuest, addCoins, submitQuest, quests, addBehaviorRequest, supportMessages, markSupportMessageAsRead, addToSchedule, addToWeeklyPlan, schedule, weeklyPlan, addQuestion, questionBank, behaviorRecords, broadcasts, addLesson, lessons } = useUser();
   const { showToast } = useToast();
   const [currentDate, setCurrentDate] = useState("");
 
@@ -124,6 +130,34 @@ function TeacherHallPageInner() {
       classId: ''
   });
   const [showPlanModal, setShowPlanModal] = useState(false);
+
+  // Smart Lesson Chronicle State
+  const [showLessonModal, setShowLessonModal] = useState(false);
+  const [lessonForm, setLessonForm] = useState({
+      classId: "",
+      subject: "",
+      summary: "",
+      imageUrl: "",
+      questions: [] as { text: string, type: 'mcq' | 'true_false' | 'image_question', options: string[], correctAnswer: string }[]
+  });
+  const [lessonAttendance, setLessonAttendance] = useState<{id: number, name: string, present: boolean}[]>([]);
+
+  useEffect(() => {
+      if (lessonForm.classId) {
+          const classStudents = allUsers.filter(u => u.role === 'student' && u.classId === lessonForm.classId);
+          setLessonAttendance(classStudents.map(s => ({ id: s.id, name: s.name, present: true })));
+      } else {
+          setLessonAttendance([]);
+      }
+  }, [lessonForm.classId, allUsers]);
+
+  // Temp state for adding questions inside lesson form
+  const [currentLessonQuestion, setCurrentLessonQuestion] = useState({
+      text: "",
+      type: 'mcq' as 'mcq' | 'true_false' | 'image_question',
+      options: ["", "", "", ""],
+      correctAnswer: "0"
+  });
 
   const [behaviorForm, setBehaviorForm] = useState({
       studentId: 0,
@@ -168,6 +202,13 @@ function TeacherHallPageInner() {
     setCurrentDate(new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
   }, []);
 
+  useEffect(() => {
+    const view = searchParams?.get('view');
+    if (view) {
+      setActiveView(view);
+    }
+  }, [searchParams]);
+
   const handleLogout = () => {
     logout();
     router.push('/');
@@ -181,9 +222,54 @@ function TeacherHallPageInner() {
   // Get students belonging to these classes
   const myStudents = allUsers.filter(u => u.role === 'student' && u.classId && teacherClassesIds.includes(u.classId));
 
+  const [showCompetitionModal, setShowCompetitionModal] = useState(false);
+  const [competitionForm, setCompetitionForm] = useState({
+      title: "",
+      description: "",
+      subject: "",
+      grade: "",
+      startTime: "",
+      durationMinutes: 30,
+      rewardGold: 100,
+      rewardXP: 200
+  });
+
+  const handleCreateCompetition = (e: React.FormEvent) => {
+      e.preventDefault();
+      addCompetition({
+          title: competitionForm.title,
+          description: competitionForm.description,
+          subject: competitionForm.subject,
+          grade: competitionForm.grade,
+          startTime: competitionForm.startTime || new Date().toISOString(),
+          durationMinutes: Number(competitionForm.durationMinutes),
+          status: 'active', // Default to active for now
+          questionIds: [], // In real app, select questions
+          rewards: {
+              gold: Number(competitionForm.rewardGold),
+              xp: Number(competitionForm.rewardXP)
+          },
+          createdBy: name
+      });
+      showToast("تم إطلاق المنافسة بنجاح! ساحة المعركة جاهزة.", "success");
+      setShowCompetitionModal(false);
+      setCompetitionForm({
+          title: "",
+          description: "",
+          subject: "",
+          grade: "",
+          startTime: "",
+          durationMinutes: 30,
+          rewardGold: 100,
+          rewardXP: 200
+      });
+  };
+
   const handleAction = (action: string) => {
     if (action === "إنشاء مهمة جديدة") {
         setShowCreateModal(true);
+    } else if (action === "إنشاء منافسة") {
+        setShowCompetitionModal(true);
     } else {
         showToast(`ميزة "${action}" قيد التطوير حالياً`, "info");
     }
@@ -236,6 +322,66 @@ function TeacherHallPageInner() {
       setShowBehaviorModal(false);
   };
 
+  const handleAddLessonQuestion = () => {
+      if (!currentLessonQuestion.text) {
+          showToast("الرجاء كتابة نص السؤال", "error");
+          return;
+      }
+      setLessonForm({
+          ...lessonForm,
+          questions: [...lessonForm.questions, { ...currentLessonQuestion }]
+      });
+      setCurrentLessonQuestion({
+          text: "",
+          type: 'mcq',
+          options: ["", "", "", ""],
+          correctAnswer: "0"
+      });
+      showToast("تم إضافة السؤال للحصة", "success");
+  };
+
+  const handleCreateLesson = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!lessonForm.classId || !lessonForm.subject || !lessonForm.summary) {
+          showToast("الرجاء تعبئة جميع الحقول المطلوبة", "error");
+          return;
+      }
+
+      const selectedClass = classes.find(c => c.id === lessonForm.classId);
+      const attendees = lessonAttendance.filter(s => s.present).map(s => s.id);
+      
+      addLesson({
+          classId: lessonForm.classId,
+          className: selectedClass?.name || "",
+          subject: lessonForm.subject,
+          date: new Date().toISOString(),
+          summary: lessonForm.summary,
+          imageUrl: lessonForm.imageUrl,
+          attendees: attendees,
+          questions: lessonForm.questions.map(q => ({
+              ...q,
+              id: Date.now().toString() + Math.random().toString(),
+              status: 'approved', // Auto-approved as it's part of lesson
+              subject: lessonForm.subject,
+              grade: selectedClass?.grade || "",
+              difficulty: 'medium',
+              authorId: currentTeacher?.id || 0,
+              authorName: name,
+              createdAt: new Date().toISOString()
+          })) as any
+      });
+
+      setShowLessonModal(false);
+      setLessonForm({
+          classId: "",
+          subject: "",
+          summary: "",
+          imageUrl: "",
+          questions: []
+      });
+      showToast("تم توثيق الحصة وإنشاء التحديات بنجاح! +20 XP", "success");
+  };
+
   if (role === 'student') {
     const visibleQuests = quests.filter(q => q.status === 'approved' || q.status === undefined);
 
@@ -258,7 +404,7 @@ function TeacherHallPageInner() {
                     تحديات الرحلة
                   </h1>
                   <h2 className="text-2xl text-[#DAA520] font-[family-name:var(--font-scheherazade)] font-bold tracking-widest">
-                    Teacher's Assignments
+                    تكليفات المعلم
                   </h2>
                   <p className="text-[#F4E4BC]/60 mt-4 text-lg">هنا تجد المهام والواجبات التي كلفك بها المعلمون</p>
                </header>
@@ -483,6 +629,7 @@ function TeacherHallPageInner() {
 
   const navItems = [
     { id: 'overview', icon: <LayoutDashboard />, label: "قاعة العرش" },
+    { id: 'lessons', icon: <ScrollText />, label: "سجل الحصة" },
     { id: 'planning', icon: <Calendar />, label: "تخطيط الزمن" },
     { id: 'questions', icon: <Brain />, label: "بنك الأسئلة" },
     { id: 'classes', icon: <BookOpen />, label: "كتائب الفرسان" },
@@ -496,6 +643,125 @@ function TeacherHallPageInner() {
 
   const renderContent = () => {
     switch (activeView) {
+      case 'leaderboard':
+        const teachers = allUsers.filter(u => u.role === 'teacher').sort((a, b) => (b.xp || 0) - (a.xp || 0));
+        const topTeacher = teachers[0];
+        
+        return (
+            <div className="space-y-8">
+                {/* Header Section */}
+                <div className="text-center mb-8 relative">
+                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#DAA520]/20 rounded-full blur-3xl -z-10" />
+                     <h2 className="text-4xl text-[#FFD700] font-[family-name:var(--font-amiri)] font-bold mb-4 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                         لوحة شرف المعلمين
+                     </h2>
+                     <p className="text-[#F4E4BC]/70 max-w-2xl mx-auto text-lg">
+                         هنا يتم تكريم فرسان العلم والمعرفة، الأكثر عطاءً وتأثيراً في بناء جيل المستقبل
+                     </p>
+                </div>
+
+                {/* Top Teacher Card */}
+                {topTeacher && (
+                    <div className="bg-gradient-to-b from-[#DAA520]/20 to-[#2A1B0E]/80 border-2 border-[#DAA520] rounded-2xl p-8 relative overflow-hidden text-center max-w-3xl mx-auto shadow-[0_0_50px_rgba(218,165,32,0.3)]">
+                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-[#FFD700] to-transparent animate-pulse" />
+                        <div className="absolute -right-10 -top-10 w-40 h-40 bg-[#DAA520]/20 rounded-full blur-2xl" />
+                        
+                        <div className="relative inline-block mb-6">
+                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-5xl animate-bounce">👑</div>
+                            <div className="w-32 h-32 rounded-full border-4 border-[#FFD700] p-1 bg-[#2A1B0E] relative z-10 shadow-xl">
+                                <div className="w-full h-full rounded-full bg-[#DAA520] flex items-center justify-center overflow-hidden">
+                                    <div className="w-full h-full bg-[url('https://api.dicebear.com/7.x/avataaars/svg?seed=Felix')] bg-cover bg-center" />
+                                </div>
+                            </div>
+                            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-[#FFD700] text-[#1E120A] px-6 py-1 rounded-full font-bold shadow-lg whitespace-nowrap border-2 border-[#1E120A]">
+                                معلم الشهر المميز
+                            </div>
+                        </div>
+
+                        <h3 className="text-3xl text-[#FFD700] font-bold font-[family-name:var(--font-amiri)] mb-2">
+                            {topTeacher.name}
+                        </h3>
+                        <p className="text-[#F4E4BC] text-lg mb-6">{topTeacher.subject || "معلم عام"}</p>
+
+                        <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto bg-[#000]/30 rounded-xl p-4 border border-[#DAA520]/30">
+                            <div className="text-center">
+                                <div className="text-[#FFD700] font-bold text-2xl">{topTeacher.xp || 0}</div>
+                                <div className="text-[#F4E4BC]/50 text-xs">نقاط الخبرة</div>
+                            </div>
+                            <div className="text-center border-x border-[#DAA520]/20">
+                                <div className="text-[#4ECDC4] font-bold text-2xl">{topTeacher.level || 1}</div>
+                                <div className="text-[#F4E4BC]/50 text-xs">المستوى</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-[#FF6B6B] font-bold text-2xl">{topTeacher.coins || 0}</div>
+                                <div className="text-[#F4E4BC]/50 text-xs">عملة ذهبية</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Leaderboard Table */}
+                <div className="bg-[#2A1B0E]/60 rounded-2xl border border-[#5D4037] overflow-hidden">
+                    <div className="p-6 border-b border-[#5D4037] flex justify-between items-center bg-[#000]/20">
+                        <h3 className="text-xl text-[#F4E4BC] font-bold flex items-center gap-2">
+                            <Trophy className="w-5 h-5 text-[#DAA520]" />
+                            ترتيب المعلمين
+                        </h3>
+                        <div className="text-sm text-[#F4E4BC]/50">يتم تحديث النقاط تلقائياً بناءً على التفاعل</div>
+                    </div>
+                    
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead className="bg-[#000]/30 text-[#F4E4BC]/60 text-sm">
+                                <tr>
+                                    <th className="py-4 px-6 text-right">#</th>
+                                    <th className="py-4 px-6 text-right">المعلم</th>
+                                    <th className="py-4 px-6 text-center">المستوى</th>
+                                    <th className="py-4 px-6 text-center">نقاط التفاعل (XP)</th>
+                                    <th className="py-4 px-6 text-center">الذهب المجمع</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#5D4037]/30">
+                                {teachers.map((teacher, index) => (
+                                    <tr key={teacher.id} className={cn(
+                                        "hover:bg-[#DAA520]/5 transition-colors",
+                                        teacher.name === name ? "bg-[#DAA520]/10" : ""
+                                    )}>
+                                        <td className="py-4 px-6">
+                                            {index === 0 ? <span className="text-2xl">🥇</span> :
+                                             index === 1 ? <span className="text-2xl">🥈</span> :
+                                             index === 2 ? <span className="text-2xl">🥉</span> :
+                                             <span className="font-bold text-[#F4E4BC]/50 w-8 inline-block text-center">{index + 1}</span>}
+                                        </td>
+                                        <td className="py-4 px-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-[#DAA520]/20 flex items-center justify-center border border-[#DAA520]/50 text-[#DAA520] font-bold">
+                                                    {teacher.name[0]}
+                                                </div>
+                                                <div>
+                                                    <div className={cn("font-bold", teacher.name === name ? "text-[#FFD700]" : "text-[#F4E4BC]")}>
+                                                        {teacher.name} {teacher.name === name && "(أنت)"}
+                                                    </div>
+                                                    <div className="text-xs text-[#F4E4BC]/50">{teacher.subject || "معلم"}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="py-4 px-6 text-center">
+                                            <span className="bg-[#4ECDC4]/10 text-[#4ECDC4] px-3 py-1 rounded-full text-xs font-bold border border-[#4ECDC4]/20">
+                                                Lv. {teacher.level || 1}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-6 text-center font-bold text-[#F4E4BC]">{teacher.xp || 0}</td>
+                                        <td className="py-4 px-6 text-center text-[#FFD700] font-bold">{teacher.coins || 0}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        );
+
       case 'overview':
         return (
           <div className="space-y-6">
@@ -569,6 +835,68 @@ function TeacherHallPageInner() {
                 </div>
              </div>
           </div>
+        );
+
+      case 'lessons':
+        const myLessons = lessons.filter(l => l.teacherId === id);
+        return (
+            <div className="space-y-6">
+                <div className="flex justify-between items-center bg-[#000]/20 p-4 rounded-xl border border-[#5D4037]">
+                    <div>
+                        <h3 className="text-[#FFD700] text-2xl font-bold font-[family-name:var(--font-amiri)] flex items-center gap-3">
+                            <ScrollText className="w-8 h-8" />
+                            سجل الحصة الذكي
+                        </h3>
+                        <p className="text-[#F4E4BC]/60 mt-1 text-sm">توثيق الحصص وتحويلها لتحديات تلقائية للطلاب</p>
+                    </div>
+                    <GoldButton onClick={() => setShowLessonModal(true)} className="px-6 py-3 shadow-[0_0_20px_rgba(218,165,32,0.3)]">
+                        <Plus className="w-5 h-5 ml-2 inline" />
+                        توثيق حصة جديدة
+                    </GoldButton>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {myLessons.length === 0 ? (
+                        <div className="col-span-full text-center py-20 text-[#F4E4BC]/50 border border-dashed border-[#5D4037] rounded-xl bg-[#000]/20">
+                            <ScrollText className="w-20 h-20 mx-auto mb-6 opacity-30" />
+                            <h4 className="text-xl font-bold mb-2">لم يتم توثيق أي حصة بعد</h4>
+                            <p>ابدأ بتوثيق حصتك الأولى ليتم إنشاء التحديات للطلاب تلقائياً</p>
+                        </div>
+                    ) : (
+                        myLessons.map((lesson) => (
+                            <div key={lesson.id} className="bg-[#2A1B0E]/60 rounded-xl border border-[#5D4037] overflow-hidden group hover:border-[#DAA520] transition-all duration-300 flex flex-col">
+                                <div className="h-32 bg-[#000]/50 relative">
+                                    {lesson.imageUrl ? (
+                                        <img src={lesson.imageUrl} alt={lesson.subject} className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity" />
+                                    ) : (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-[#DAA520]/10">
+                                            <BookOpen className="w-12 h-12 text-[#DAA520]/30" />
+                                        </div>
+                                    )}
+                                    <div className="absolute top-2 right-2 bg-[#000]/60 backdrop-blur-sm px-3 py-1 rounded-full border border-[#DAA520]/30 text-xs text-[#FFD700]">
+                                        {new Date(lesson.createdAt).toLocaleDateString('ar-SA')}
+                                    </div>
+                                </div>
+                                <div className="p-5 flex-1 flex flex-col">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className="text-[#FFD700] font-bold text-lg font-[family-name:var(--font-amiri)]">{lesson.subject}</h4>
+                                        <span className="text-[#4ECDC4] text-xs bg-[#4ECDC4]/10 px-2 py-1 rounded">{lesson.className}</span>
+                                    </div>
+                                    <p className="text-[#F4E4BC]/70 text-sm line-clamp-3 mb-4 flex-1">{lesson.summary}</p>
+                                    
+                                    <div className="border-t border-[#5D4037]/50 pt-3 flex justify-between items-center text-xs text-[#F4E4BC]/50">
+                                        <div className="flex gap-3">
+                                            <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {lesson.attendees?.length || 0} حضور</span>
+                                            <span className="flex items-center gap-1"><Brain className="w-3 h-3" /> {lesson.questions?.length || 0} أسئلة</span>
+                                        </div>
+                                        <button className="text-[#DAA520] hover:underline">التفاصيل</button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
         );
 
       case 'planning':
@@ -1021,46 +1349,130 @@ function TeacherHallPageInner() {
         );
 
       case 'messages':
+         // Filter messages based on active tab
+         const filteredMessages = supportMessages.filter(msg => {
+             if (activeMessageTab === 'all') return true;
+             if (activeMessageTab === 'students') return msg.type === 'student_msg';
+             if (activeMessageTab === 'parents') return msg.type === 'parent_msg' || msg.type === 'parent';
+             if (activeMessageTab === 'admin') return msg.type === 'admin_msg' || msg.type === 'admin';
+             return false;
+         });
+
+         // Filter broadcasts
+         const teacherBroadcasts = broadcasts.filter(b => b.targetRole === 'all' || b.targetRole === 'teacher');
+
+         // Prepare display list
+         let displayItems: any[] = [];
+         
+         if (activeMessageTab === 'broadcasts') {
+             displayItems = teacherBroadcasts.map(b => ({ ...b, isBroadcast: true }));
+         } else if (activeMessageTab === 'all') {
+             displayItems = [
+                 ...teacherBroadcasts.map(b => ({ ...b, isBroadcast: true })),
+                 ...filteredMessages.map(m => ({ ...m, isBroadcast: false }))
+             ];
+             // Sort by date if possible, otherwise keep order
+             displayItems.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+         } else {
+             displayItems = filteredMessages.map(m => ({ ...m, isBroadcast: false }));
+         }
+
          return (
             <div className="h-full flex flex-col">
-               <div className="flex gap-4 mb-4 border-b border-[#5D4037] pb-4">
-                  <button className="text-[#FFD700] font-bold border-b-2 border-[#FFD700] pb-1">الكل</button>
-                  <button className="text-[#F4E4BC]/60 hover:text-[#F4E4BC] pb-1">أولياء الأمور</button>
-                  <button className="text-[#F4E4BC]/60 hover:text-[#F4E4BC] pb-1">الإدارة</button>
+               {/* Tabs Navigation */}
+               <div className="flex gap-2 mb-6 border-b border-[#5D4037] pb-4 overflow-x-auto">
+                  {[
+                      { id: 'all', label: 'الكل' },
+                      { id: 'broadcasts', label: 'مراسيم المملكة', icon: <Crown className="w-4 h-4" /> },
+                      { id: 'students', label: 'الطلاب' },
+                      { id: 'parents', label: 'أولياء الأمور' },
+                      { id: 'admin', label: 'الإدارة' },
+                  ].map((tab) => (
+                      <button
+                          key={tab.id}
+                          onClick={() => setActiveMessageTab(tab.id as any)}
+                          className={cn(
+                              "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap",
+                              activeMessageTab === tab.id
+                                  ? "bg-[#DAA520] text-[#2A1B0E] shadow-[0_0_10px_rgba(218,165,32,0.4)]"
+                                  : "bg-[#000]/20 text-[#F4E4BC]/60 hover:text-[#F4E4BC] hover:bg-[#DAA520]/10"
+                          )}
+                      >
+                          {tab.icon}
+                          {tab.label}
+                      </button>
+                  ))}
                </div>
-               <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
-                  {supportMessages.length === 0 ? (
+
+               {/* Content */}
+               <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
+                  {displayItems.length === 0 ? (
                       <div className="text-center py-10 text-[#F4E4BC]/50">
-                          <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                          <p>لا توجد رسائل جديدة.</p>
+                          {activeMessageTab === 'broadcasts' ? <Crown className="w-16 h-16 mx-auto mb-4 opacity-50" /> : <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />}
+                          <p>لا توجد رسائل أو مراسيم في هذا التصنيف.</p>
                       </div>
                   ) : (
-                      supportMessages.map((msg) => (
-                         <div 
-                            key={msg.id} 
-                            onClick={() => {
-                                setSelectedMessage(msg);
-                                if (!msg.read) markSupportMessageAsRead(msg.id);
-                            }}
-                            className={cn(
-                                "p-4 rounded-lg border cursor-pointer transition-colors flex gap-4",
-                                msg.read 
-                                    ? "bg-[#000]/20 border-[#5D4037] hover:border-[#DAA520]" 
-                                    : "bg-[#DAA520]/10 border-[#DAA520]/50 hover:bg-[#DAA520]/20"
-                            )}
-                         >
-                            <div className="w-10 h-10 rounded-full bg-[#5D4037] flex items-center justify-center text-[#F4E4BC] font-bold shrink-0">
-                               {msg.senderName.charAt(0)}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                               <div className="flex justify-between items-center mb-1">
-                                  <h4 className={cn("font-bold text-sm truncate", !msg.read && "text-[#FFD700]")}>{msg.senderName}</h4>
-                                  <span className="text-[#F4E4BC]/40 text-xs whitespace-nowrap">{msg.date}</span>
-                               </div>
-                               <p className="text-[#F4E4BC]/60 text-xs truncate">{msg.message}</p>
-                            </div>
-                            {!msg.read && <div className="w-2 h-2 rounded-full bg-[#FF6B6B] self-center" />}
-                         </div>
+                      displayItems.map((item) => (
+                          item.isBroadcast ? (
+                              <motion.div
+                                  key={`broadcast-${item.id}`}
+                                  initial={{ opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  onClick={() => setSelectedBroadcast(item)}
+                                  className="p-4 rounded-xl border border-[#DAA520]/50 bg-[#DAA520]/10 cursor-pointer hover:bg-[#DAA520]/20 transition-all group relative overflow-hidden"
+                              >
+                                  <div className="absolute top-0 right-0 p-2 opacity-10">
+                                      <Crown className="w-24 h-24 text-[#FFD700]" />
+                                  </div>
+                                  <div className="flex items-start gap-4 relative z-10">
+                                      <div className="bg-[#DAA520]/20 p-3 rounded-full shrink-0">
+                                          <ScrollText className="w-6 h-6 text-[#FFD700]" />
+                                      </div>
+                                      <div className="flex-1">
+                                          <div className="flex justify-between items-start mb-1">
+                                              <h4 className="font-bold text-[#FFD700] text-lg font-[family-name:var(--font-amiri)]">{item.title}</h4>
+                                              <span className="text-[#F4E4BC]/40 text-xs bg-[#000]/30 px-2 py-1 rounded">{item.date ? new Date(item.date).toLocaleDateString('ar-SA') : 'الآن'}</span>
+                                          </div>
+                                          <p className="text-[#F4E4BC]/80 text-sm line-clamp-2">{item.message}</p>
+                                          <div className="mt-2 flex items-center gap-2 text-xs text-[#DAA520]/70">
+                                              <Crown className="w-3 h-3" />
+                                              <span>من: {item.senderName}</span>
+                                          </div>
+                                      </div>
+                                  </div>
+                              </motion.div>
+                          ) : (
+                             <div 
+                                key={`msg-${item.id}`} 
+                                onClick={() => {
+                                    setSelectedMessage(item);
+                                    if (!item.read) markSupportMessageAsRead(item.id);
+                                }}
+                                className={cn(
+                                    "p-4 rounded-lg border cursor-pointer transition-colors flex gap-4",
+                                    item.read 
+                                        ? "bg-[#000]/20 border-[#5D4037] hover:border-[#DAA520]" 
+                                        : "bg-[#DAA520]/10 border-[#DAA520]/50 hover:bg-[#DAA520]/20"
+                                )}
+                             >
+                                <div className="w-10 h-10 rounded-full bg-[#5D4037] flex items-center justify-center text-[#F4E4BC] font-bold shrink-0 border border-[#DAA520]/30">
+                                   {item.senderName.charAt(0)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                   <div className="flex justify-between items-center mb-1">
+                                      <h4 className={cn("font-bold text-sm truncate", !item.read && "text-[#FFD700]")}>{item.senderName}</h4>
+                                      <span className="text-[#F4E4BC]/40 text-xs whitespace-nowrap">{item.date}</span>
+                                   </div>
+                                   <p className="text-[#F4E4BC]/60 text-xs truncate">{item.message}</p>
+                                   <div className="mt-2 flex gap-2">
+                                       {item.type === 'student_msg' && <span className="text-[10px] px-2 py-0.5 bg-[#4ECDC4]/10 text-[#4ECDC4] rounded-full border border-[#4ECDC4]/20">طالب</span>}
+                                       {item.type === 'parent_msg' && <span className="text-[10px] px-2 py-0.5 bg-[#FFD700]/10 text-[#FFD700] rounded-full border border-[#FFD700]/20">ولي أمر</span>}
+                                       {item.type === 'admin_msg' && <span className="text-[10px] px-2 py-0.5 bg-[#FF6B6B]/10 text-[#FF6B6B] rounded-full border border-[#FF6B6B]/20">إدارة</span>}
+                                   </div>
+                                </div>
+                                {!item.read && <div className="w-2 h-2 rounded-full bg-[#FF6B6B] self-center animate-pulse" />}
+                             </div>
+                          )
                       ))
                   )}
                </div>
@@ -1081,97 +1493,176 @@ function TeacherHallPageInner() {
     <>
       <MobileNav />
       <PageTransition>
-        <main className="min-h-screen bg-[url('https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=2670&auto=format&fit=crop')] bg-cover bg-center overflow-hidden flex">
-          {/* Dark Overlay */}
-          <div className="absolute inset-0 bg-black/50 z-0 pointer-events-none" />
+        <main className="min-h-screen bg-[url('https://images.unsplash.com/photo-1507842217121-9e8712e2f344?q=80&w=2670&auto=format&fit=crop')] bg-cover bg-center overflow-hidden flex font-[family-name:var(--font-cairo)]">
+          {/* Enhanced Atmospheric Overlays */}
+          <div className="absolute inset-0 bg-[#0a0502]/70 mix-blend-multiply z-0 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#1E120A] via-transparent to-[#1E120A]/50 z-0 pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_0%,_#000000_100%)] opacity-60 z-0 pointer-events-none" />
 
-          {/* Sidebar */}
-          <div className="relative z-10 hidden lg:block h-screen sticky top-0 w-64 p-4">
-             <div className="bg-[#2A1B0E]/95 h-full rounded-2xl border-2 border-[#DAA520] shadow-2xl flex flex-col overflow-hidden">
-                <div className="p-6 border-b border-[#DAA520]/30 text-center">
-                    <h2 className="text-2xl text-[#FFD700] font-[family-name:var(--font-amiri)]">قصر المعلمين</h2>
-                    <p className="text-[#F4E4BC]/60 text-xs mt-1">بوابة المعلم</p>
+          {/* Sidebar - Creative Redesign */}
+          <div className="relative z-20 hidden lg:block h-screen sticky top-0 w-80 p-6">
+             <div className="h-full flex flex-col relative">
+                {/* Sidebar Background */}
+                <div className="absolute inset-0 bg-[#1E120A]/80 backdrop-blur-xl rounded-[2rem] border border-[#DAA520]/20 shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden">
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')] opacity-10 mix-blend-overlay" />
+                    <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[#DAA520]/10 to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#000] to-transparent" />
+                </div>
+
+                {/* Profile Section - Top */}
+                <div className="relative z-10 pt-8 pb-6 px-4 text-center border-b border-[#DAA520]/10 mx-4 mb-2">
+                    <div className="relative inline-block mb-4 group cursor-pointer" onClick={() => setShowProfileModal(true)}>
+                        <div className="absolute inset-0 bg-[#DAA520] blur-md opacity-20 group-hover:opacity-40 transition-opacity rounded-full" />
+                        <div className="w-20 h-20 rounded-full bg-[#2A1B0E] border-2 border-[#DAA520] p-1 relative z-10 overflow-hidden shadow-lg group-hover:scale-105 transition-transform duration-300">
+                            <div className="w-full h-full rounded-full bg-[#DAA520] flex items-center justify-center text-[#2A1B0E] text-3xl font-bold font-[family-name:var(--font-amiri)]">
+                                {name.charAt(0)}
+                            </div>
+                        </div>
+                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-[#DAA520] text-[#1E120A] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#2A1B0E] shadow-sm whitespace-nowrap">
+                            Lv. {currentTeacher?.level || 15}
+                        </div>
+                    </div>
+                    <h2 className="text-xl text-[#FFD700] font-[family-name:var(--font-amiri)] font-bold tracking-wide">{name}</h2>
+                    <p className="text-[#DAA520]/60 text-xs mt-1">المعلم الحكيم</p>
                 </div>
                 
-                <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1 custom-scrollbar">
+                {/* Navigation Menu */}
+                <nav className="flex-1 overflow-y-auto py-2 px-3 space-y-2 custom-scrollbar relative z-10">
                     {navItems.map((item) => (
                         <button
                             key={item.id}
                             onClick={() => setActiveView(item.id)}
                             className={cn(
-                                "w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 text-right",
+                                "w-full flex items-center gap-4 p-3 rounded-xl transition-all duration-300 group relative overflow-hidden",
                                 activeView === item.id 
-                                    ? "bg-[#DAA520] text-[#2A1B0E] font-bold shadow-[0_0_15px_rgba(218,165,32,0.4)]" 
-                                    : "text-[#F4E4BC] hover:bg-[#DAA520]/10 hover:text-[#FFD700]"
+                                    ? "text-[#1E120A]" 
+                                    : "text-[#F4E4BC]/70 hover:text-[#FFD700]"
                             )}
                         >
-                            {item.icon}
-                            <span className="font-[family-name:var(--font-cairo)] text-sm">{item.label}</span>
+                            {/* Active Background */}
+                            {activeView === item.id && (
+                                <motion.div 
+                                    layoutId="activeTabBg"
+                                    className="absolute inset-0 bg-gradient-to-r from-[#DAA520] to-[#F4E4BC] rounded-xl z-0"
+                                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                                />
+                            )}
+                            
+                            {/* Hover Effect */}
+                            {activeView !== item.id && (
+                                <div className="absolute inset-0 bg-[#DAA520]/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl z-0" />
+                            )}
+
+                            <span className={cn(
+                                "relative z-10 transition-transform duration-300 group-hover:scale-110",
+                                activeView === item.id ? "text-[#1E120A]" : "text-[#DAA520]"
+                            )}>
+                                {item.icon}
+                            </span>
+                            <span className={cn(
+                                "relative z-10 font-bold text-sm transition-all duration-300",
+                                activeView === item.id ? "translate-x-1" : "group-hover:translate-x-1"
+                            )}>
+                                {item.label}
+                            </span>
+                            
+                            {/* Active Indicator Dot */}
+                            {activeView === item.id && (
+                                <motion.div 
+                                    initial={{ scale: 0 }} 
+                                    animate={{ scale: 1 }}
+                                    className="absolute left-4 w-2 h-2 bg-[#1E120A] rounded-full z-10"
+                                />
+                            )}
                         </button>
                     ))}
                 </nav>
 
-                <div className="p-4 border-t border-[#DAA520]/30">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-full bg-[#DAA520] flex items-center justify-center text-[#2A1B0E] font-bold">
-                            {name.charAt(0)}
-                        </div>
-                        <div className="overflow-hidden">
-                            <p className="text-[#F4E4BC] font-bold truncate text-sm">{name}</p>
-                            <p className="text-[#F4E4BC]/50 text-xs">معلم رياضيات</p>
-                        </div>
-                    </div>
+                {/* Footer / Logout */}
+                <div className="p-6 relative z-10">
                     <button
                         onClick={handleLogout}
-                        className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-[#FF6B6B] hover:bg-[#FF6B6B]/10 transition-all duration-300 border border-[#FF6B6B]/20"
+                        className="w-full flex items-center justify-center gap-2 p-3 rounded-xl text-[#FF6B6B] hover:bg-[#FF6B6B]/10 hover:shadow-[0_0_20px_rgba(255,107,107,0.1)] transition-all duration-300 border border-[#FF6B6B]/20 group bg-[#000]/20"
                     >
-                        <LogOut className="w-4 h-4" />
-                        <span className="font-[family-name:var(--font-cairo)] text-sm">تسجيل الخروج</span>
+                        <LogOut className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                        <span className="font-bold text-sm">تسجيل الخروج</span>
                     </button>
                 </div>
              </div>
           </div>
 
-          {/* Main Content */}
-          <div className="relative z-10 flex-1 h-screen overflow-y-auto p-4 lg:p-8">
-            <div className="w-full max-w-6xl mx-auto flex flex-col min-h-full">
-              {/* Header */}
-              <header className="flex flex-col md:flex-row justify-between items-center mb-8 bg-[#2A1B0E]/80 px-6 py-4 rounded-xl border border-[#DAA520]/30 backdrop-blur-md gap-4">
-                <div>
-                  <h1 className="text-2xl md:text-3xl text-[#FFD700] font-[family-name:var(--font-amiri)]">
-                    {navItems.find(i => i.id === activeView)?.label}
-                  </h1>
-                  <p className="text-[#F4E4BC]/60 text-sm mt-1">
-                    {currentDate}
-                  </p>
-                </div>
-                <div className="flex gap-3 items-center">
-                  <NotificationCenter />
-                  <GoldButton variant="secondary" className="px-6 text-sm" onClick={() => handleAction("مراسلة ولي الأمر")}>
-                    <MessageCircle className="w-4 h-4 ml-2 inline" />
-                    مراسلة
-                  </GoldButton>
-                  <GoldButton className="px-6 text-sm" onClick={() => handleAction("إنشاء مهمة جديدة")}>
-                    <Plus className="w-4 h-4 ml-2 inline" />
-                    مهمة جديدة
-                  </GoldButton>
-                </div>
+          {/* Main Content Area */}
+          <div className="relative z-10 flex-1 h-screen overflow-y-auto p-4 lg:p-8 custom-scrollbar">
+            <div className="w-full max-w-7xl mx-auto flex flex-col min-h-full gap-6">
+              
+              {/* Top Bar - Transparent & Floating */}
+              <header className="flex flex-col md:flex-row justify-between items-center bg-[#1E120A]/40 backdrop-blur-md px-8 py-5 rounded-[2rem] border border-[#DAA520]/20 shadow-lg relative overflow-hidden group hover:bg-[#1E120A]/60 transition-colors">
+                 <div className="absolute inset-0 bg-gradient-to-r from-[#DAA520]/5 to-transparent opacity-50" />
+                 
+                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-center w-full gap-6">
+                    <div className="flex items-center gap-5">
+                        <div className="p-3 bg-gradient-to-br from-[#DAA520] to-[#B8860B] rounded-2xl shadow-lg text-[#1E120A] transform rotate-3 group-hover:rotate-0 transition-transform duration-300">
+                            {navItems.find(i => i.id === activeView)?.icon}
+                        </div>
+                        <div>
+                          <h1 className="text-3xl text-[#FFD700] font-[family-name:var(--font-amiri)] font-bold drop-shadow-sm">
+                            {navItems.find(i => i.id === activeView)?.label}
+                          </h1>
+                          <div className="flex items-center gap-2 text-[#F4E4BC]/60 text-xs mt-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#4ECDC4] animate-pulse" />
+                            <p>{currentDate}</p>
+                          </div>
+                        </div>
+                    </div>
+                    
+                    <div className="flex gap-3 items-center">
+                      <NotificationCenter />
+                      <div className="h-8 w-[1px] bg-[#DAA520]/20 mx-2 hidden md:block" />
+                      <GoldButton variant="secondary" className="px-5 text-sm h-10 rounded-xl" onClick={() => handleAction("مراسلة ولي الأمر")}>
+                        <MessageCircle className="w-4 h-4 ml-2 inline" />
+                        مراسلة
+                      </GoldButton>
+                      <GoldButton className="px-5 text-sm h-10 rounded-xl shadow-[0_0_15px_rgba(218,165,32,0.3)]" onClick={() => handleAction("إنشاء منافسة")}>
+                        <Swords className="w-4 h-4 ml-2 inline" />
+                        منافسة جديدة
+                      </GoldButton>
+                      <GoldButton className="px-5 text-sm h-10 rounded-xl shadow-[0_0_15px_rgba(218,165,32,0.3)]" onClick={() => handleAction("إنشاء مهمة جديدة")}>
+                        <Plus className="w-4 h-4 ml-2 inline" />
+                        مهمة جديدة
+                      </GoldButton>
+                    </div>
+                 </div>
               </header>
 
-              {/* Dynamic Content Area */}
-              <GameCard className="bg-[#2A1B0E]/90 min-h-[500px] border-[#DAA520]/30">
-                 <AnimatePresence mode="wait">
-                    <motion.div
-                        key={activeView}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 20 }}
-                        transition={{ duration: 0.2 }}
-                    >
-                        {renderContent()}
-                    </motion.div>
-                 </AnimatePresence>
-              </GameCard>
+              {/* Main Content Card - The "Scroll/Tablet" */}
+              <div className="relative flex-1 bg-[#1E120A]/80 backdrop-blur-md rounded-[2.5rem] border border-[#DAA520]/30 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden group">
+                 {/* Magical Glow Effects */}
+                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2/3 h-1 bg-[#DAA520] blur-sm opacity-50" />
+                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-2/3 h-1 bg-[#DAA520] blur-sm opacity-30" />
+                 
+                 {/* Corner Accents */}
+                 <svg className="absolute top-4 left-4 w-12 h-12 text-[#DAA520]/40" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20,20 L50,20 M20,20 L20,50" />
+                 </svg>
+                 <svg className="absolute top-4 right-4 w-12 h-12 text-[#DAA520]/40 transform rotate-90" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20,20 L50,20 M20,20 L20,50" />
+                 </svg>
+                 
+                 <div className="relative z-10 p-6 md:p-10 flex-1 overflow-hidden flex flex-col">
+                     <AnimatePresence mode="wait">
+                        <motion.div
+                            key={activeView}
+                            initial={{ opacity: 0, y: 10, scale: 0.99 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -10, scale: 0.99 }}
+                            transition={{ duration: 0.3, ease: "easeOut" }}
+                            className="h-full"
+                        >
+                            {renderContent()}
+                        </motion.div>
+                     </AnimatePresence>
+                 </div>
+              </div>
             </div>
           </div>
         </main>
@@ -1180,28 +1671,7 @@ function TeacherHallPageInner() {
       {/* Create Quest Modal */}
       <AnimatePresence>
           {showCreateModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-                onClick={() => setShowCreateModal(false)}
-              />
-              
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                className="relative z-50 bg-[#2A1B0E] border-2 border-[#DAA520] p-8 rounded-2xl max-w-lg w-full shadow-2xl"
-              >
-                 <div className="flex justify-between items-center mb-6 border-b border-[#5D4037] pb-4">
-                    <h2 className="text-2xl text-[#FFD700] font-[family-name:var(--font-amiri)]">إنشاء مهمة جديدة</h2>
-                    <button onClick={() => setShowCreateModal(false)} className="text-[#F4E4BC] hover:text-[#FF6B6B]">
-                        <X className="w-6 h-6" />
-                    </button>
-                 </div>
-
+            <FantasyModal onClose={() => setShowCreateModal(false)} title="إنشاء مهمة جديدة">
                  <form onSubmit={handleCreateQuest} className="space-y-4">
                     <div>
                         <label className="block text-[#F4E4BC] mb-2 font-[family-name:var(--font-cairo)]">عنوان المهمة</label>
@@ -1275,36 +1745,14 @@ function TeacherHallPageInner() {
                         <GoldButton type="submit" className="px-8">نشر المهمة</GoldButton>
                     </div>
                  </form>
-              </motion.div>
-            </div>
+            </FantasyModal>
           )}
       </AnimatePresence>
 
       {/* Question Modal */}
       <AnimatePresence>
           {showQuestionModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-                onClick={() => setShowQuestionModal(false)}
-              />
-              
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                className="relative z-50 bg-[#2A1B0E] border-2 border-[#DAA520] p-8 rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar"
-              >
-                 <div className="flex justify-between items-center mb-6 border-b border-[#5D4037] pb-4">
-                    <h2 className="text-2xl text-[#FFD700] font-[family-name:var(--font-amiri)]">إضافة سؤال جديد</h2>
-                    <button onClick={() => setShowQuestionModal(false)} className="text-[#F4E4BC] hover:text-[#FF6B6B]">
-                        <X className="w-6 h-6" />
-                    </button>
-                 </div>
-
+            <FantasyModal onClose={() => setShowQuestionModal(false)} title="إضافة سؤال جديد" className="max-h-[90vh] overflow-y-auto custom-scrollbar">
                  <form onSubmit={handleAddQuestion} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -1450,8 +1898,7 @@ function TeacherHallPageInner() {
                         <GoldButton type="submit" className="px-8">إرسال للاعتماد</GoldButton>
                     </div>
                  </form>
-              </motion.div>
-            </div>
+            </FantasyModal>
           )}
       </AnimatePresence>
 
@@ -1460,30 +1907,7 @@ function TeacherHallPageInner() {
       {/* Plan/Schedule Modal */}
       <AnimatePresence>
           {showPlanModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-                onClick={() => setShowPlanModal(false)}
-              />
-              
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                className="relative z-50 bg-[#2A1B0E] border-2 border-[#DAA520] p-8 rounded-2xl max-w-lg w-full shadow-2xl"
-              >
-                 <div className="flex justify-between items-center mb-6 border-b border-[#5D4037] pb-4">
-                    <h2 className="text-2xl text-[#FFD700] font-[family-name:var(--font-amiri)]">
-                        {planForm.type === 'schedule' ? 'إضافة حصة للجدول' : 'إضافة عنصر للخطة'}
-                    </h2>
-                    <button onClick={() => setShowPlanModal(false)} className="text-[#F4E4BC] hover:text-[#FF6B6B]">
-                        <X className="w-6 h-6" />
-                    </button>
-                 </div>
-
+            <FantasyModal onClose={() => setShowPlanModal(false)} title={planForm.type === 'schedule' ? 'إضافة حصة للجدول' : 'إضافة عنصر للخطة'}>
                  <form onSubmit={handleSubmitPlan} className="space-y-4">
                     <div>
                         <label className="block text-[#F4E4BC] mb-2 font-[family-name:var(--font-cairo)]">الفصل الدراسي</label>
@@ -1582,45 +2006,22 @@ function TeacherHallPageInner() {
                         <GoldButton type="submit" className="px-8">حفظ</GoldButton>
                     </div>
                  </form>
-              </motion.div>
-            </div>
+            </FantasyModal>
           )}
       </AnimatePresence>
 
       {/* Behavior Request Modal */}
       <AnimatePresence>
           {showBehaviorModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-                onClick={() => setShowBehaviorModal(false)}
-              />
-              
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                className={cn(
-                    "relative z-50 bg-[#2A1B0E] border-2 p-8 rounded-2xl max-w-lg w-full shadow-2xl",
-                    behaviorForm.type === 'positive' ? "border-[#4ECDC4]" : "border-[#FF6B6B]"
-                )}
-              >
-                 <div className="flex justify-between items-center mb-6 border-b border-[#5D4037] pb-4">
-                    <h2 className={cn(
-                        "text-2xl font-[family-name:var(--font-amiri)] flex items-center gap-2",
-                        behaviorForm.type === 'positive' ? "text-[#4ECDC4]" : "text-[#FF6B6B]"
-                    )}>
+            <FantasyModal 
+                onClose={() => setShowBehaviorModal(false)}
+                title={
+                    <span className={cn("flex items-center gap-2", behaviorForm.type === 'positive' ? "text-[#4ECDC4]" : "text-[#FF6B6B]")}>
                         {behaviorForm.type === 'positive' ? <Star className="w-6 h-6" /> : <ShieldAlert className="w-6 h-6" />}
                         {behaviorForm.type === 'positive' ? "تسجيل تعزيز سلوكي" : "تسجيل ملاحظة سلوكية"}
-                    </h2>
-                    <button onClick={() => setShowBehaviorModal(false)} className="text-[#F4E4BC] hover:text-[#FF6B6B]">
-                        <X className="w-6 h-6" />
-                    </button>
-                 </div>
-
+                    </span>
+                }
+            >
                  <div className="mb-4 text-center">
                      <p className="text-[#F4E4BC] text-lg font-bold">{behaviorForm.studentName}</p>
                  </div>
@@ -1702,8 +2103,7 @@ function TeacherHallPageInner() {
                         </GoldButton>
                     </div>
                  </form>
-              </motion.div>
-            </div>
+            </FantasyModal>
           )}
       </AnimatePresence>
 
@@ -1715,71 +2115,515 @@ function TeacherHallPageInner() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                    className="absolute inset-0 bg-black/90 backdrop-blur-md"
                     onClick={() => setSelectedMessage(null)}
                 />
                 
                 <motion.div
-                    initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                    initial={{ scale: 0.95, opacity: 0, y: 20 }}
                     animate={{ scale: 1, opacity: 1, y: 0 }}
-                    exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                    className="relative z-50 bg-[#2A1B0E] border-2 border-[#DAA520] p-8 rounded-2xl max-w-lg w-full shadow-2xl"
+                    exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                    className="relative z-50 w-full max-w-2xl max-h-[90vh] flex flex-col"
                 >
-                    <div className="flex justify-between items-center mb-6 border-b border-[#5D4037] pb-4">
-                        <div className="flex items-center gap-4">
-                             <div className="w-12 h-12 rounded-full bg-[#5D4037] flex items-center justify-center text-[#F4E4BC] font-bold text-xl">
-                                {selectedMessage.senderName.charAt(0)}
-                             </div>
-                             <div>
-                                 <h2 className="text-xl text-[#FFD700] font-[family-name:var(--font-amiri)]">
-                                     {selectedMessage.senderName}
-                                 </h2>
-                                 <p className="text-[#F4E4BC]/50 text-xs">{selectedMessage.date}</p>
-                             </div>
-                        </div>
-                        <button onClick={() => setSelectedMessage(null)} className="text-[#F4E4BC] hover:text-[#FF6B6B]">
-                            <X className="w-6 h-6" />
-                        </button>
-                    </div>
+                    {/* Fantasy Frame Structure */}
+                    <div className="relative bg-[#1E120A] border-[3px] border-[#DAA520] rounded-lg shadow-[0_0_60px_rgba(218,165,32,0.2)] flex flex-col overflow-hidden max-h-full">
+                        {/* Inner Decorative Border */}
+                        <div className="absolute inset-1 border border-[#DAA520]/30 rounded-md pointer-events-none" />
+                        
+                        {/* Corner Ornaments */}
+                        <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-[#DAA520] rounded-tl-none z-20 pointer-events-none" />
+                        <div className="absolute top-0 right-0 w-16 h-16 border-t-4 border-r-4 border-[#DAA520] rounded-tr-none z-20 pointer-events-none" />
+                        <div className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-[#DAA520] rounded-bl-none z-20 pointer-events-none" />
+                        <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-[#DAA520] rounded-br-none z-20 pointer-events-none" />
 
-                    <div className="space-y-6">
-                        <div className="flex flex-wrap gap-4 text-sm text-[#F4E4BC]/70 bg-[#000]/20 p-4 rounded-lg">
-                            {selectedMessage.mobile && (
-                                <span className="flex items-center gap-2">
-                                    <Smartphone className="w-4 h-4 text-[#DAA520]" />
-                                    {selectedMessage.mobile}
-                                </span>
-                            )}
-                            {selectedMessage.email && (
-                                <span className="flex items-center gap-2">
-                                    <Mail className="w-4 h-4 text-[#DAA520]" />
-                                    {selectedMessage.email}
-                                </span>
-                            )}
-                            {selectedMessage.type && (
-                                <span className="flex items-center gap-2">
-                                    <Info className="w-4 h-4 text-[#DAA520]" />
-                                    {selectedMessage.type}
-                                </span>
-                            )}
-                        </div>
+                        {/* Background Texture */}
+                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')] opacity-40 pointer-events-none" />
+                        <div className="absolute inset-0 bg-gradient-to-b from-[#DAA520]/5 via-transparent to-[#DAA520]/5 pointer-events-none" />
 
-                        <div className="bg-[#F4E4BC]/5 p-6 rounded-xl border border-[#DAA520]/20 min-h-[150px]">
-                            <p className="text-[#F4E4BC] leading-relaxed whitespace-pre-wrap">
-                                {selectedMessage.message}
-                            </p>
-                        </div>
-                    </div>
+                        {/* Content Container - Scrollable */}
+                        <div className="relative z-10 p-6 md:p-8 overflow-y-auto custom-scrollbar">
+                            {/* Header */}
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 border-b border-[#DAA520]/30 pb-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="relative shrink-0">
+                                        <div className="absolute inset-0 bg-[#DAA520] blur-md opacity-40 rounded-full" />
+                                        <div className="relative w-14 h-14 rounded-full bg-[#2A1B0E] border-2 border-[#DAA520] flex items-center justify-center text-[#FFD700] font-bold text-xl shadow-inner">
+                                            {selectedMessage.senderName.charAt(0)}
+                                        </div>
+                                        {/* Status Indicator */}
+                                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#2A1B0E] rounded-full flex items-center justify-center border border-[#DAA520]">
+                                            <div className="w-2.5 h-2.5 rounded-full bg-[#4ECDC4] animate-pulse" />
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <h2 className="text-2xl text-[#FFD700] font-[family-name:var(--font-amiri)] font-bold drop-shadow-sm">
+                                            {selectedMessage.senderName}
+                                        </h2>
+                                        <div className="flex items-center gap-2 mt-1 text-[#F4E4BC]/60 text-xs">
+                                            <span className="flex items-center gap-1 bg-[#000]/30 px-2 py-0.5 rounded">
+                                                <Clock className="w-3 h-3 text-[#DAA520]" />
+                                                {selectedMessage.date}
+                                            </span>
+                                            <span className="h-1 w-1 rounded-full bg-[#DAA520]" />
+                                            <span className="text-[#DAA520]">{selectedMessage.type === 'student_msg' ? 'طالب' : selectedMessage.type === 'parent_msg' ? 'ولي أمر' : 'إدارة'}</span>
+                                        </div>
+                                    </div>
+                                </div>
 
-                    <div className="pt-8 flex justify-end">
-                        <GoldButton onClick={() => setSelectedMessage(null)} className="px-8">
-                            إغلاق
-                        </GoldButton>
+                                <button 
+                                    onClick={() => setSelectedMessage(null)}
+                                    className="group p-2 rounded-full hover:bg-[#FF6B6B]/20 transition-colors border border-transparent hover:border-[#FF6B6B]/50 absolute top-4 left-4 md:static md:top-auto md:left-auto"
+                                    title="إغلاق"
+                                >
+                                    <X className="w-5 h-5 text-[#F4E4BC]/50 group-hover:text-[#FF6B6B]" />
+                                </button>
+                            </div>
+
+                            {/* Contact Info Bar */}
+                            {(selectedMessage.mobile || selectedMessage.email) && (
+                                <div className="flex flex-wrap gap-3 mb-6 p-3 bg-[#000]/40 rounded-lg border border-[#DAA520]/20 shadow-inner text-sm">
+                                    {selectedMessage.mobile && (
+                                        <div className="flex items-center gap-2 text-[#F4E4BC]">
+                                            <div className="p-1.5 bg-[#DAA520]/10 rounded-full">
+                                                <Smartphone className="w-3.5 h-3.5 text-[#DAA520]" />
+                                            </div>
+                                            <span className="font-mono dir-ltr">{selectedMessage.mobile}</span>
+                                        </div>
+                                    )}
+                                    {selectedMessage.email && (
+                                        <div className="flex items-center gap-2 text-[#F4E4BC]">
+                                            <div className="p-1.5 bg-[#DAA520]/10 rounded-full">
+                                                <Mail className="w-3.5 h-3.5 text-[#DAA520]" />
+                                            </div>
+                                            <span className="font-mono truncate max-w-[200px]">{selectedMessage.email}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Message Body */}
+                            <div className="relative mb-6">
+                                <div className="absolute -left-2 -top-2 opacity-10 pointer-events-none">
+                                    <MessageCircle className="w-24 h-24 text-[#DAA520]" />
+                                </div>
+                                <div className="bg-[#F4E4BC]/5 p-6 rounded-xl border border-[#DAA520]/20 min-h-[120px] shadow-inner backdrop-blur-sm relative z-10">
+                                    <p className="text-[#F4E4BC] text-base leading-relaxed whitespace-pre-wrap font-[family-name:var(--font-cairo)] text-justify">
+                                        {selectedMessage.message}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Footer Actions */}
+                            <div className="flex justify-end gap-3 pt-4 border-t border-[#DAA520]/30">
+                                <button 
+                                    onClick={() => handleAction("رد على الرسالة")}
+                                    className="px-4 py-2 rounded-lg border border-[#DAA520] text-[#DAA520] hover:bg-[#DAA520] hover:text-[#1E120A] transition-all font-bold flex items-center gap-2 text-sm"
+                                >
+                                    <MessageCircle className="w-4 h-4" />
+                                    <span>رد على الرسالة</span>
+                                </button>
+                                <GoldButton onClick={() => setSelectedMessage(null)} className="px-6 py-2 text-sm min-w-[100px]">
+                                    إغلاق
+                                </GoldButton>
+                            </div>
+                        </div>
                     </div>
                 </motion.div>
             </div>
         )}
       </AnimatePresence>
+      {/* Broadcast Details Modal (Reused from Student City for consistency) */}
+      <AnimatePresence>
+         {selectedBroadcast && (
+           <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+              <motion.div 
+                 initial={{ opacity: 0 }}
+                 animate={{ opacity: 1 }}
+                 exit={{ opacity: 0 }}
+                 className="absolute inset-0 bg-black/90 backdrop-blur-md"
+                 onClick={() => setSelectedBroadcast(null)}
+              />
+              
+              <motion.div
+                 initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                 animate={{ scale: 1, opacity: 1, y: 0 }}
+                 exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                 className="relative z-50 w-full max-w-2xl max-h-[90vh] flex flex-col"
+              >
+                 {/* Fantasy Frame Structure */}
+                 <div className="relative bg-[#1E120A] border-[3px] border-[#DAA520] rounded-lg shadow-[0_0_60px_rgba(218,165,32,0.2)] flex flex-col overflow-hidden max-h-full">
+                    {/* Inner Decorative Border */}
+                    <div className="absolute inset-1 border border-[#DAA520]/30 rounded-md pointer-events-none" />
+                    
+                    {/* Corner Ornaments */}
+                    <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-[#DAA520] rounded-tl-none z-20 pointer-events-none" />
+                    <div className="absolute top-0 right-0 w-16 h-16 border-t-4 border-r-4 border-[#DAA520] rounded-tr-none z-20 pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-[#DAA520] rounded-bl-none z-20 pointer-events-none" />
+                    <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-[#DAA520] rounded-br-none z-20 pointer-events-none" />
+
+                    {/* Background Texture */}
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')] opacity-40 pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-[#DAA520]/5 via-transparent to-[#DAA520]/5 pointer-events-none" />
+
+                    {/* Content Container - Scrollable */}
+                    <div className="relative z-10 p-6 md:p-8 overflow-y-auto custom-scrollbar">
+                        {/* Header */}
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 border-b border-[#DAA520]/30 pb-4">
+                            <div className="flex items-center gap-4">
+                                <div className="relative shrink-0">
+                                    <div className="absolute inset-0 bg-[#DAA520] blur-md opacity-40 rounded-full" />
+                                    <div className="relative w-14 h-14 rounded-full bg-[#2A1B0E] border-2 border-[#DAA520] flex items-center justify-center text-[#FFD700] font-bold text-xl shadow-inner">
+                                        <Crown className="w-8 h-8" />
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h2 className="text-2xl text-[#FFD700] font-[family-name:var(--font-amiri)] font-bold drop-shadow-sm">
+                                        {selectedBroadcast.title}
+                                    </h2>
+                                    <div className="flex items-center gap-2 mt-1 text-[#F4E4BC]/60 text-xs">
+                                        <span className="flex items-center gap-1 bg-[#000]/30 px-2 py-0.5 rounded">
+                                            <Calendar className="w-3 h-3 text-[#DAA520]" />
+                                            {selectedBroadcast.date ? new Date(selectedBroadcast.date).toLocaleDateString('ar-SA') : ''}
+                                        </span>
+                                        <span className="h-1 w-1 rounded-full bg-[#DAA520]" />
+                                        <span className="text-[#DAA520]">مرسوم ملكي</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={() => setSelectedBroadcast(null)}
+                                className="group p-2 rounded-full hover:bg-[#FF6B6B]/20 transition-colors border border-transparent hover:border-[#FF6B6B]/50 absolute top-4 left-4 md:static md:top-auto md:left-auto"
+                                title="إغلاق"
+                            >
+                                <X className="w-5 h-5 text-[#F4E4BC]/50 group-hover:text-[#FF6B6B]" />
+                            </button>
+                        </div>
+
+                        {/* Message Body */}
+                        <div className="relative mb-6">
+                            <div className="absolute -left-2 -top-2 opacity-10 pointer-events-none">
+                                <ScrollText className="w-24 h-24 text-[#DAA520]" />
+                            </div>
+                            <div className="bg-[#F4E4BC]/5 p-6 rounded-xl border border-[#DAA520]/20 min-h-[120px] shadow-inner backdrop-blur-sm relative z-10">
+                                <p className="text-[#F4E4BC] text-base leading-relaxed whitespace-pre-wrap font-[family-name:var(--font-cairo)] text-justify">
+                                    {selectedBroadcast.message}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Footer Actions */}
+                        <div className="flex justify-center pt-4 border-t border-[#DAA520]/30">
+                            <GoldButton onClick={() => setSelectedBroadcast(null)} className="px-8 py-2 text-base">
+                                علم
+                            </GoldButton>
+                        </div>
+                    </div>
+                 </div>
+              </motion.div>
+           </div>
+         )}
+      </AnimatePresence>
+
+      {/* Smart Lesson Chronicle Modal */}
+      <AnimatePresence>
+          {showLessonModal && (
+            <FantasyModal onClose={() => setShowLessonModal(false)} title="توثيق حصة جديدة" className="max-h-[90vh] overflow-y-auto custom-scrollbar">
+                 <form onSubmit={handleCreateLesson} className="space-y-6">
+                    {/* Basic Info */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-[#F4E4BC] mb-2 font-[family-name:var(--font-cairo)]">الفصل الدراسي</label>
+                            <select 
+                                required
+                                value={lessonForm.classId}
+                                onChange={(e) => setLessonForm({...lessonForm, classId: e.target.value})}
+                                className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none"
+                            >
+                                <option value="">اختر الفصل...</option>
+                                {teacherClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-[#F4E4BC] mb-2 font-[family-name:var(--font-cairo)]">المادة / الموضوع</label>
+                            <input 
+                                type="text" 
+                                required
+                                value={lessonForm.subject}
+                                onChange={(e) => setLessonForm({...lessonForm, subject: e.target.value})}
+                                className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none" 
+                                placeholder="مثال: الكسور العشرية" 
+                            />
+                        </div>
+                    </div>
+
+                    {/* Attendance Checklist - Interactive */}
+                    <div className="bg-[#DAA520]/10 border border-[#DAA520]/30 p-4 rounded-lg">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <CheckCircle2 className="w-6 h-6 text-[#DAA520]" />
+                                <div>
+                                    <h4 className="text-[#FFD700] font-bold">تحضير الطلاب</h4>
+                                    <p className="text-[#F4E4BC]/60 text-xs">سجل الحضور والغياب لهذه الحصة</p>
+                                </div>
+                            </div>
+                            <div className="text-[#F4E4BC]/60 text-xs">
+                                {lessonAttendance.filter(s => s.present).length} / {lessonAttendance.length} حاضر
+                            </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
+                            {lessonAttendance.map((student, index) => (
+                                <div key={student.id} className={cn(
+                                    "flex items-center justify-between p-2 rounded border transition-colors",
+                                    student.present ? "bg-[#4ECDC4]/10 border-[#4ECDC4]/30" : "bg-[#FF6B6B]/10 border-[#FF6B6B]/30"
+                                )}>
+                                    <span className="text-[#F4E4BC] text-sm">{student.name}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const newAttendance = [...lessonAttendance];
+                                            newAttendance[index].present = !newAttendance[index].present;
+                                            setLessonAttendance(newAttendance);
+                                        }}
+                                        className={cn(
+                                            "px-2 py-0.5 rounded text-xs font-bold transition-colors",
+                                            student.present ? "bg-[#4ECDC4]/20 text-[#4ECDC4] hover:bg-[#4ECDC4]/30" : "bg-[#FF6B6B]/20 text-[#FF6B6B] hover:bg-[#FF6B6B]/30"
+                                        )}
+                                    >
+                                        {student.present ? "حاضر" : "غائب"}
+                                    </button>
+                                </div>
+                            ))}
+                            {lessonAttendance.length === 0 && (
+                                <p className="col-span-full text-center text-[#F4E4BC]/40 text-sm py-4">اختر الفصل أولاً لعرض قائمة الطلاب</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Summary */}
+                    <div>
+                        <label className="block text-[#F4E4BC] mb-2 font-[family-name:var(--font-cairo)]">ملخص الحصة</label>
+                        <textarea 
+                            rows={3} 
+                            required
+                            value={lessonForm.summary}
+                            onChange={(e) => setLessonForm({...lessonForm, summary: e.target.value})}
+                            className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none" 
+                            placeholder="اكتب ملخصاً سريعاً لما تم شرحه..."
+                        ></textarea>
+                    </div>
+
+                    {/* Image */}
+                    <div>
+                        <label className="block text-[#F4E4BC] mb-2 font-[family-name:var(--font-cairo)]">صورة من السبورة / النشاط (اختياري)</label>
+                        <div className="flex gap-2">
+                             <input 
+                                type="text" 
+                                value={lessonForm.imageUrl}
+                                onChange={(e) => setLessonForm({...lessonForm, imageUrl: e.target.value})}
+                                className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none"
+                                placeholder="رابط الصورة..."
+                             />
+                             <div className="p-3 bg-[#000]/30 border border-[#5D4037] rounded-lg text-[#F4E4BC]/50">
+                                <ImageIcon className="w-6 h-6" />
+                             </div>
+                        </div>
+                    </div>
+
+                    {/* End of Day Questions */}
+                    <div className="border-t border-[#5D4037] pt-6">
+                        <h3 className="text-[#FFD700] font-bold text-lg mb-4 flex items-center gap-2">
+                            <Brain className="w-5 h-5" />
+                            أسئلة نهاية اليوم (التحدي المسائي)
+                        </h3>
+                        
+                        {/* Questions List */}
+                        <div className="space-y-3 mb-4">
+                            {lessonForm.questions.map((q, i) => (
+                                <div key={i} className="bg-[#000]/30 p-3 rounded border border-[#5D4037] flex justify-between items-center">
+                                    <span className="text-[#F4E4BC] text-sm truncate max-w-[80%]">{i + 1}. {q.text}</span>
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            const newQuestions = [...lessonForm.questions];
+                                            newQuestions.splice(i, 1);
+                                            setLessonForm({...lessonForm, questions: newQuestions});
+                                        }}
+                                        className="text-[#FF6B6B] hover:text-[#FF6B6B]/80"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                            {lessonForm.questions.length === 0 && (
+                                <p className="text-[#F4E4BC]/40 text-sm text-center py-2">أضف 1-3 أسئلة لتظهر للطلاب كتحدي مسائي</p>
+                            )}
+                        </div>
+
+                        {/* Add Question Form */}
+                        {lessonForm.questions.length < 3 && (
+                            <div className="bg-[#2A1B0E]/50 p-4 rounded-lg border border-[#5D4037]/50">
+                                <div className="space-y-3">
+                                    <input 
+                                        type="text" 
+                                        value={currentLessonQuestion.text}
+                                        onChange={(e) => setCurrentLessonQuestion({...currentLessonQuestion, text: e.target.value})}
+                                        className="w-full bg-[#000]/30 border border-[#5D4037] rounded p-2 text-[#F4E4BC] text-sm focus:border-[#DAA520] outline-none"
+                                        placeholder="نص السؤال..."
+                                    />
+                                    
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {currentLessonQuestion.options.map((opt, i) => (
+                                            <input 
+                                                key={i}
+                                                type="text" 
+                                                value={opt}
+                                                onChange={(e) => {
+                                                    const newOpts = [...currentLessonQuestion.options];
+                                                    newOpts[i] = e.target.value;
+                                                    setCurrentLessonQuestion({...currentLessonQuestion, options: newOpts});
+                                                }}
+                                                className={`w-full bg-[#000]/30 border rounded p-2 text-[#F4E4BC] text-xs outline-none ${currentLessonQuestion.correctAnswer === i.toString() ? 'border-[#4ECDC4]' : 'border-[#5D4037]'}`}
+                                                placeholder={`الخيار ${i + 1} ${currentLessonQuestion.correctAnswer === i.toString() ? '(الصحيح)' : ''}`}
+                                            />
+                                        ))}
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2 text-xs text-[#F4E4BC]/60">
+                                        <span>الإجابة الصحيحة:</span>
+                                        {[0, 1, 2, 3].map(i => (
+                                            <button
+                                                key={i}
+                                                type="button"
+                                                onClick={() => setCurrentLessonQuestion({...currentLessonQuestion, correctAnswer: i.toString()})}
+                                                className={`w-6 h-6 rounded-full border ${currentLessonQuestion.correctAnswer === i.toString() ? 'bg-[#4ECDC4] text-[#0a192f] border-[#4ECDC4]' : 'border-[#5D4037]'}`}
+                                            >
+                                                {i + 1}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <GoldButton type="button" onClick={handleAddLessonQuestion} className="w-full py-2 text-sm mt-2" variant="secondary">
+                                        <Plus className="w-4 h-4 ml-2 inline" />
+                                        إضافة السؤال
+                                    </GoldButton>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="pt-4 flex justify-end gap-3 border-t border-[#DAA520]/30 mt-6">
+                        <button type="button" onClick={() => setShowLessonModal(false)} className="px-6 py-2 text-[#F4E4BC] hover:bg-[#5D4037]/50 rounded-lg transition-colors">إلغاء</button>
+                        <GoldButton type="submit" className="px-8 shadow-[0_0_20px_rgba(218,165,32,0.4)]">
+                             حفظ وتوثيق
+                        </GoldButton>
+                    </div>
+                 </form>
+            </FantasyModal>
+          )}
+      </AnimatePresence>
+
+      {/* Competition Modal */}
+      <AnimatePresence>
+          {showCompetitionModal && (
+            <FantasyModal onClose={() => setShowCompetitionModal(false)} title="إطلاق منافسة جديدة">
+                 <form onSubmit={handleCreateCompetition} className="space-y-4">
+                    <div>
+                        <label className="block text-[#F4E4BC] mb-2 font-[family-name:var(--font-cairo)]">عنوان المنافسة</label>
+                        <input 
+                            type="text" 
+                            required
+                            value={competitionForm.title}
+                            onChange={(e) => setCompetitionForm({...competitionForm, title: e.target.value})}
+                            className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none" 
+                            placeholder="مثال: دوري فرسان الرياضيات" 
+                        />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-[#F4E4BC] mb-2 font-[family-name:var(--font-cairo)]">المادة</label>
+                            <input 
+                                type="text" 
+                                required
+                                value={competitionForm.subject}
+                                onChange={(e) => setCompetitionForm({...competitionForm, subject: e.target.value})}
+                                className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none" 
+                                placeholder="الرياضيات" 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[#F4E4BC] mb-2 font-[family-name:var(--font-cairo)]">الصف المستهدف</label>
+                            <select 
+                                required
+                                value={competitionForm.grade}
+                                onChange={(e) => setCompetitionForm({...competitionForm, grade: e.target.value})}
+                                className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none"
+                            >
+                                <option value="">اختر الصف...</option>
+                                {teacherClasses.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-[#F4E4BC] mb-2 font-[family-name:var(--font-cairo)]">وصف قصير</label>
+                        <textarea 
+                            rows={3}
+                            value={competitionForm.description}
+                            onChange={(e) => setCompetitionForm({...competitionForm, description: e.target.value})}
+                            className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none"
+                            placeholder="وصف قواعد المنافسة..."
+                        ></textarea>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-[#F4E4BC] mb-2 font-[family-name:var(--font-cairo)]">المدة (دقيقة)</label>
+                            <input 
+                                type="number" 
+                                required
+                                value={competitionForm.durationMinutes}
+                                onChange={(e) => setCompetitionForm({...competitionForm, durationMinutes: Number(e.target.value)})}
+                                className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none" 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[#FFD700] mb-2 font-[family-name:var(--font-cairo)]">جائزة الذهب</label>
+                            <input 
+                                type="number" 
+                                required
+                                value={competitionForm.rewardGold}
+                                onChange={(e) => setCompetitionForm({...competitionForm, rewardGold: Number(e.target.value)})}
+                                className="w-full bg-[#000]/30 border border-[#FFD700] rounded-lg p-3 text-[#FFD700] focus:border-[#DAA520] outline-none" 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[#4ECDC4] mb-2 font-[family-name:var(--font-cairo)]">جائزة XP</label>
+                            <input 
+                                type="number" 
+                                required
+                                value={competitionForm.rewardXP}
+                                onChange={(e) => setCompetitionForm({...competitionForm, rewardXP: Number(e.target.value)})}
+                                className="w-full bg-[#000]/30 border border-[#4ECDC4] rounded-lg p-3 text-[#4ECDC4] focus:border-[#DAA520] outline-none" 
+                            />
+                        </div>
+                    </div>
+
+                    <div className="pt-4 flex justify-end gap-3 border-t border-[#DAA520]/30 mt-2">
+                        <button type="button" onClick={() => setShowCompetitionModal(false)} className="px-6 py-2 text-[#F4E4BC] hover:bg-[#5D4037]/50 rounded-lg transition-colors">إلغاء</button>
+                        <GoldButton type="submit" className="px-8 shadow-[0_0_20px_rgba(218,165,32,0.4)]">
+                             إطلاق المنافسة
+                        </GoldButton>
+                    </div>
+                 </form>
+            </FantasyModal>
+          )}
+      </AnimatePresence>
+
       <AtherMind />
     </>
   );

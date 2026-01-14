@@ -135,13 +135,26 @@ export default function AtherMindPage() {
                   <GameCard className="bg-[#112240]/80 border-[#4ECDC4]/50">
                     <h3 className="text-[#4ECDC4] font-bold mb-4 font-[family-name:var(--font-cairo)]">مسائل الذكاء</h3>
                     <ul className="space-y-2 text-[#F4E4BC]/80 text-sm">
-                      <li className="flex items-center gap-2 cursor-pointer hover:text-[#FFD700]">
+                      <li 
+                        onClick={() => { setInputValue("أريد تحدي في الخوارزميات"); handleSend(); }}
+                        className="flex items-center gap-2 cursor-pointer hover:text-[#FFD700] transition-colors"
+                      >
                         <Sparkles className="w-4 h-4" />
                         <span>تحدي اليوم: الخوارزميات</span>
                       </li>
-                      <li className="flex items-center gap-2 cursor-pointer hover:text-[#FFD700]">
+                      <li 
+                        onClick={() => { setInputValue("أعطني لغز فيزياء"); handleSend(); }}
+                        className="flex items-center gap-2 cursor-pointer hover:text-[#FFD700] transition-colors"
+                      >
                         <Sparkles className="w-4 h-4" />
                         <span>لغز الفيزياء</span>
+                      </li>
+                      <li 
+                        onClick={() => { setInputValue("شرح قاعدة النحو"); handleSend(); }}
+                        className="flex items-center gap-2 cursor-pointer hover:text-[#FFD700] transition-colors"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        <span>مراجعة النحو</span>
                       </li>
                     </ul>
                   </GameCard>

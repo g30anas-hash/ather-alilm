@@ -4,14 +4,14 @@ import { useState, useEffect } from "react";
 import GameCard from "@/components/GameCard";
 import GoldButton from "@/components/GoldButton";
 import SidebarWorld from "@/components/SidebarWorld";
-import { BookOpen, Calendar, GraduationCap, Heart, LineChart, Shield, Target, User, X, BrainCircuit, Users, LogOut, Map, Swords, Star } from "lucide-react";
+import { BookOpen, Calendar, GraduationCap, Heart, LineChart, Shield, Target, User, X, BrainCircuit, Users, LogOut, Map, Swords, Star, ScrollText, Brain } from "lucide-react";
 import PageTransition from "@/components/PageTransition";
 import MobileNav from "@/components/MobileNav";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser, UserData } from "@/context/UserContext";
 import { useToast } from "@/context/ToastContext";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import ProfileModal from "@/components/ProfileModal";
 import NotificationCenter from "@/components/NotificationCenter";
 import WeekMap from "@/components/WeekMap";
@@ -20,9 +20,10 @@ import JourneyHour from "@/components/JourneyHour";
 export default function ParentObservatoryPage() {
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const { name, role, allUsers, logout, behaviorRecords } = useUser();
+  const { name, role, allUsers, logout, behaviorRecords, lessons } = useUser();
   const { showToast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Parent Logic
   const currentUser = allUsers.find(u => u.name === name && u.role === role);
@@ -30,6 +31,13 @@ export default function ParentObservatoryPage() {
   const myChildren = allUsers.filter(u => childrenIds.includes(u.id));
   
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const view = searchParams?.get('view');
+    if (view) {
+      setSelectedItem(view);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (myChildren.length > 0 && !selectedChildId) {
@@ -53,6 +61,9 @@ export default function ParentObservatoryPage() {
   const childBehaviors = behaviorRecords.filter(b => b.studentId === selectedChild?.id);
   const positiveBehaviors = childBehaviors.filter(b => b.type === 'positive');
   const negativeBehaviors = childBehaviors.filter(b => b.type === 'negative');
+
+  const childLessons = lessons.filter(l => l.classId === selectedChild?.classId);
+  childLessons.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const [showContactModal, setShowContactModal] = useState(false);
   const [contactMessage, setContactMessage] = useState("");
@@ -86,6 +97,7 @@ export default function ParentObservatoryPage() {
     { id: 'rank', icon: <GraduationCap className="w-8 h-8" />, label: "مستوى القوة", color: "text-[#A3CB38]", detail: `المستوى الحالي: ${childStats.level}. استمر في التقدم!` },
     { id: 'behavior', icon: <Shield className="w-8 h-8" />, label: "ميثاق الشرف", color: "text-[#EE5A24]", detail: `سجل السلوك: ${positiveBehaviors.length} إيجابي | ${negativeBehaviors.length} ملاحظات` },
     { id: 'subjects', icon: <BookOpen className="w-8 h-8" />, label: "فنون المعرفة", color: "text-[#12CBC4]", detail: "6 مواد مسجلة. المادة المفضلة: العلوم." },
+    { id: 'lessons', icon: <ScrollText className="w-8 h-8" />, label: "سجل الحصص", color: "text-[#DAA520]", detail: `تم توثيق ${childLessons.length} حصة دراسية.` },
     { id: 'schedule', icon: <Map className="w-8 h-8" />, label: "خريطة الأسبوع", color: "text-[#FFD700]", detail: "جدول الحصص والخطط الأسبوعية." },
     { id: 'competitions', icon: <Swords className="w-8 h-8" />, label: "ساحة أثير", color: "text-[#FF4757]", detail: "شارك في 3 منافسات هذا الشهر. حقق المركز الأول في الرياضيات!" },
   ];
@@ -215,7 +227,33 @@ export default function ParentObservatoryPage() {
                         {selectedData?.label}
                       </h2>
                       
-                      {selectedItem === 'schedule' ? (
+                      {selectedItem === 'lessons' ? (
+                          <div className="w-full max-w-4xl space-y-6 max-h-[400px] overflow-y-auto custom-scrollbar pr-2 text-right">
+                              {childLessons.length === 0 ? (
+                                  <p className="text-center text-[#F4E4BC]/50 py-8">لا توجد حصص مسجلة حتى الآن</p>
+                              ) : (
+                                  childLessons.map((lesson) => (
+                                      <div key={lesson.id} className="bg-[#000]/30 border border-[#5D4037] p-6 rounded-xl flex gap-6 hover:border-[#DAA520] transition-colors">
+                                          {lesson.imageUrl && (
+                                              <img src={lesson.imageUrl} alt={lesson.subject} className="w-24 h-24 object-cover rounded-lg border border-[#5D4037]" />
+                                          )}
+                                          <div className="flex-1">
+                                              <div className="flex justify-between items-start mb-2">
+                                                  <h3 className="text-[#FFD700] font-bold text-xl font-[family-name:var(--font-amiri)]">{lesson.subject}</h3>
+                                                  <span className="text-[#F4E4BC]/40 text-sm bg-[#DAA520]/10 px-2 py-1 rounded">{new Date(lesson.createdAt).toLocaleDateString('ar-SA')}</span>
+                                              </div>
+                                              <p className="text-[#F4E4BC]/80 mb-3 text-sm leading-relaxed">{lesson.summary}</p>
+                                              <div className="flex gap-4 text-xs text-[#F4E4BC]/50">
+                                                  <span>المعلم: {lesson.teacherName}</span>
+                                                  <span>•</span>
+                                                  <span>التحديات: {lesson.questions?.length || 0}</span>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  ))
+                              )}
+                          </div>
+                      ) : selectedItem === 'schedule' ? (
                           <div className="w-full max-w-4xl space-y-8 text-right">
                               <JourneyHour />
                               <WeekMap />
@@ -298,41 +336,65 @@ export default function ParentObservatoryPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                    className="absolute inset-0 bg-black/90 backdrop-blur-md"
                     onClick={() => setShowContactModal(false)}
                 />
                 
                 <motion.div
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.9, opacity: 0 }}
-                    className="relative z-50 bg-[#2A1B0E] border-2 border-[#DAA520] p-8 rounded-2xl w-full max-w-lg shadow-2xl"
+                    initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                    className="relative z-50 w-full max-w-lg max-h-[90vh] flex flex-col"
                 >
-                    <button 
-                        onClick={() => setShowContactModal(false)}
-                        className="absolute top-4 left-4 text-[#F4E4BC] hover:text-[#FF6B6B]"
-                    >
-                        <X className="w-6 h-6" />
-                    </button>
+                    {/* Fantasy Frame Structure */}
+                    <div className="relative bg-[#1E120A] border-[3px] border-[#DAA520] rounded-lg shadow-[0_0_60px_rgba(218,165,32,0.2)] flex flex-col overflow-hidden max-h-full">
+                        {/* Inner Decorative Border */}
+                        <div className="absolute inset-1 border border-[#DAA520]/30 rounded-md pointer-events-none" />
+                        
+                        {/* Corner Ornaments */}
+                        <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-[#DAA520] rounded-tl-none z-20 pointer-events-none" />
+                        <div className="absolute top-0 right-0 w-16 h-16 border-t-4 border-r-4 border-[#DAA520] rounded-tr-none z-20 pointer-events-none" />
+                        <div className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-[#DAA520] rounded-bl-none z-20 pointer-events-none" />
+                        <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-[#DAA520] rounded-br-none z-20 pointer-events-none" />
 
-                    <h2 className="text-2xl font-bold text-[#FFD700] font-[family-name:var(--font-amiri)] mb-6 text-center">
-                        تواصل مع المعلم
-                    </h2>
+                        {/* Background Texture */}
+                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')] opacity-40 pointer-events-none" />
+                        <div className="absolute inset-0 bg-gradient-to-b from-[#DAA520]/5 via-transparent to-[#DAA520]/5 pointer-events-none" />
 
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-[#F4E4BC] text-sm mb-2">نص الرسالة</label>
-                            <textarea
-                                value={contactMessage}
-                                onChange={(e) => setContactMessage(e.target.value)}
-                                placeholder="اكتب استفسارك أو ملاحظتك هنا..."
-                                className="w-full h-32 bg-[#000]/30 border border-[#5D4037] rounded-lg p-4 text-[#F4E4BC] focus:border-[#DAA520] outline-none resize-none font-[family-name:var(--font-cairo)]"
-                            />
+                        {/* Content Container */}
+                        <div className="relative z-10 p-6 md:p-8 overflow-y-auto custom-scrollbar">
+                            <div className="flex justify-between items-center mb-6 border-b border-[#DAA520]/30 pb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-[#DAA520]/10 rounded-full border border-[#DAA520]">
+                                        <Swords className="w-6 h-6 text-[#DAA520]" />
+                                    </div>
+                                    <h2 className="text-2xl text-[#FFD700] font-[family-name:var(--font-amiri)] font-bold">
+                                        تواصل مع المعلم
+                                    </h2>
+                                </div>
+                                <button onClick={() => setShowContactModal(false)} className="text-[#F4E4BC]/50 hover:text-[#FF6B6B] transition-colors">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-[#F4E4BC] text-sm mb-2 font-[family-name:var(--font-cairo)]">نص الرسالة</label>
+                                    <textarea
+                                        value={contactMessage}
+                                        onChange={(e) => setContactMessage(e.target.value)}
+                                        placeholder="اكتب استفسارك أو ملاحظتك هنا..."
+                                        className="w-full h-32 bg-[#000]/30 border border-[#DAA520]/30 rounded-lg p-4 text-[#F4E4BC] focus:border-[#DAA520] outline-none resize-none font-[family-name:var(--font-cairo)] placeholder-[#F4E4BC]/20"
+                                    />
+                                </div>
+
+                                <div className="pt-2">
+                                    <GoldButton fullWidth onClick={handleSendMessage} className="py-3 text-base">
+                                        إرسال
+                                    </GoldButton>
+                                </div>
+                            </div>
                         </div>
-
-                        <GoldButton fullWidth onClick={handleSendMessage}>
-                            إرسال
-                        </GoldButton>
                     </div>
                 </motion.div>
             </div>
