@@ -249,7 +249,7 @@ function TeacherHallPageInner() {
               gold: Number(competitionForm.rewardGold),
               xp: Number(competitionForm.rewardXP)
           },
-          createdBy: name
+          createdBy: id || 0
       });
       showToast("تم إطلاق المنافسة بنجاح! ساحة المعركة جاهزة.", "success");
       setShowCompetitionModal(false);
