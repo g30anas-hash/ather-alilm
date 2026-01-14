@@ -7,6 +7,8 @@ interface GameCardProps {
   className?: string;
   title?: string;
   onClick?: () => void;
+  action?: React.ReactNode;
+  headerIcon?: React.ReactNode;
 }
 
 export default function GameCard({ title, children, className, action, headerIcon, onClick }: GameCardProps) {
