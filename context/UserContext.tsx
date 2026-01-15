@@ -545,6 +545,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           submissions: mappedSubmissions
         }));
 
+        // Real-time Subscriptions
+        const channels = [
+            supabase.channel('public:support_messages').on('postgres_changes', { event: '*', schema: 'public', table: 'support_messages' }, (payload) => {
+                // Simplified: Refetch or append. For now, we will just refetch everything to be safe and simple
+                fetchInitialData(); 
+            }).subscribe(),
+            supabase.channel('public:quest_submissions').on('postgres_changes', { event: '*', schema: 'public', table: 'quest_submissions' }, () => fetchInitialData()).subscribe(),
+            supabase.channel('public:users').on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => fetchInitialData()).subscribe(),
+            supabase.channel('public:market_items').on('postgres_changes', { event: '*', schema: 'public', table: 'market_items' }, () => fetchInitialData()).subscribe(),
+            supabase.channel('public:competitions').on('postgres_changes', { event: '*', schema: 'public', table: 'competitions' }, () => fetchInitialData()).subscribe(),
+        ];
+
         // Auth State Listener
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (session?.user?.email) {
@@ -585,6 +597,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
         return () => {
             subscription.unsubscribe();
+            channels.forEach(c => supabase.removeChannel(c));
         };
 
       } catch (error) {

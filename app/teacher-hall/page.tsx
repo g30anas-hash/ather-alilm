@@ -1275,14 +1275,21 @@ function TeacherHallPageInner() {
                            <div className="flex justify-between items-start border-b border-[#5D4037] pb-3">
                               <div>
                                  <h4 className="text-[#FFD700] font-bold font-[family-name:var(--font-amiri)] text-xl">{sub.questTitle}</h4>
-                                 <p className="text-[#F4E4BC]/60 text-sm mt-1">الطالب: <span className="text-[#4ECDC4]">{sub.studentName}</span> | التاريخ: {sub.date}</p>
+                                 <p className="text-[#F4E4BC]/60 text-sm mt-1">الطالب: <span className="text-[#4ECDC4]">{sub.studentName}</span> | التاريخ: {new Date(sub.date).toLocaleDateString('ar-SA')}</p>
                               </div>
                               <span className="bg-[#FFD700]/10 text-[#FFD700] text-xs px-2 py-1 rounded">قيد المراجعة</span>
                            </div>
                            
                            <div className="bg-[#000]/40 p-4 rounded border border-[#5D4037]/50">
                               <p className="text-[#F4E4BC]/50 text-xs mb-2">إجابة الطالب:</p>
-                              <p className="text-[#F4E4BC] font-[family-name:var(--font-cairo)] leading-relaxed">{sub.answer}</p>
+                              <p className="text-[#F4E4BC] font-[family-name:var(--font-cairo)] leading-relaxed whitespace-pre-wrap">{sub.answer}</p>
+                              {/* Display Attachment if exists (logic to detect image url) */}
+                              {sub.answer.match(/https?:\/\/.*\.(jpeg|jpg|gif|png)/) && (
+                                  <div className="mt-4">
+                                      <p className="text-[#F4E4BC]/50 text-xs mb-1">المرفقات:</p>
+                                      <img src={sub.answer.match(/https?:\/\/.*\.(jpeg|jpg|gif|png)/)![0]} alt="Attachment" className="max-w-xs rounded border border-[#5D4037]" />
+                                  </div>
+                              )}
                            </div>
 
                            <div className="flex justify-end gap-3 mt-2">

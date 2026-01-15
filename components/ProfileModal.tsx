@@ -46,7 +46,8 @@ export default function ProfileModal({ isOpen, onClose, targetUserId }: ProfileM
           updateFrame(value);
           showToast("تم تحديث الإطار", "success");
       }
-      setShowInventory(false);
+      // Keep modal open to allow equipping more items or just reviewing
+      // setShowInventory(false); 
   };
 
   const handleSave = (e: React.FormEvent) => {
