@@ -71,7 +71,7 @@ export default function SidebarWorld() {
       roles: ['student'],
       checkActive: (p, s) => p === "/student-city" && s.get('view') === 'planning'
     },
-    { icon: <Sword className="w-5 h-5" />, label: "تحديات الرحلة", href: "/teacher-hall", roles: ['student'] },
+    { icon: <Sword className="w-5 h-5" />, label: "تحديات الرحلة", href: "/ather-arena", roles: ['student'] },
     { icon: <Gem className="w-5 h-5" />, label: "الكنوز والمكافآت", href: "/treasures", roles: ['student'] },
     { icon: <Shield className="w-5 h-5" />, label: "برج الحكمة", href: "/wisdom-tower", roles: ['student'] },
     { 
