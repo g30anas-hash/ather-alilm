@@ -251,6 +251,36 @@ function LeadershipPalacePageContent() {
       image: "https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=magical%20item%20treasure&image_size=square",
       type: "frame"
   });
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!e.target.files || e.target.files.length === 0) return;
+      
+      const file = e.target.files[0];
+      setIsUploading(true);
+      
+      try {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+          const filePath = `${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+              .from('market-items')
+              .upload(filePath, file);
+
+          if (uploadError) throw uploadError;
+
+          const { data } = supabase.storage.from('market-items').getPublicUrl(filePath);
+          
+          setMarketItemForm(prev => ({ ...prev, image: data.publicUrl }));
+          showToast("تم رفع الصورة بنجاح", "success");
+      } catch (error) {
+          console.error('Error uploading image:', error);
+          showToast("فشل رفع الصورة", "error");
+      } finally {
+          setIsUploading(false);
+      }
+  };
 
   const handleSaveMarketItem = (e: React.FormEvent) => {
       e.preventDefault();
@@ -808,37 +838,7 @@ function LeadershipPalacePageContent() {
   };
 
   const [showRoleModal, setShowRoleModal] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!e.target.files || e.target.files.length === 0) return;
-      
-      setIsUploading(true);
-      const file = e.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      try {
-          const { error: uploadError } = await supabase.storage
-              .from('market-items')
-              .upload(filePath, file);
-
-          if (uploadError) throw uploadError;
-
-          const { data: { publicUrl } } = supabase.storage
-              .from('market-items')
-              .getPublicUrl(filePath);
-
-          setMarketItemForm(prev => ({ ...prev, image: publicUrl }));
-          showToast("تم رفع الصورة بنجاح", "success");
-      } catch (error) {
-          console.error(error);
-          showToast("فشل رفع الصورة", "error");
-      } finally {
-          setIsUploading(false);
-      }
-  };
   const [editingRole, setEditingRole] = useState<any | null>(null);
   const [roleForm, setRoleForm] = useState({ name: "", permissions: [] as string[] });
   const [availableRoles, setAvailableRoles] = useState([

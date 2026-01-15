@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   X, Save, User, UserCircle, Star, Shield, Award, Scroll, 
   Map, Activity, BookOpen, Crown, Zap, BarChart3, MessageSquare,
-  Users, Bot, GraduationCap, School, Coins, Gem, Calendar
+  Users, Bot, GraduationCap, School, Coins, Gem, Calendar, Palette
 } from "lucide-react";
 import GoldButton from "./GoldButton";
 import { useUser, UserRole } from "@/context/UserContext";
