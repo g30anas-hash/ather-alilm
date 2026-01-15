@@ -36,7 +36,7 @@ const generateMockQuestions = (subject: string, count: number): Question[] => {
 
 function KnowledgeMapsContent() {
   const router = useRouter();
-  const { addQuest, addXP, addCoins, mapNodes } = useUser();
+  const { addQuest, addXP, addCoins, mapNodes, questionBank } = useUser();
   const { showToast } = useToast();
   
   const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
@@ -70,8 +70,16 @@ function KnowledgeMapsContent() {
                 // Use custom questions added by admin
                 quizQuestions = selectedNode.customQuestions;
             } else {
-                // Fallback to AI Generation
-                quizQuestions = generateMockQuestions(selectedNode?.subject || 'General', selectedNode?.questionsCount || 5);
+                // Try to find questions from the bank first
+                const bankQuestions = questionBank.filter(q => q.subject === selectedNode?.subject);
+                
+                if (bankQuestions.length >= (selectedNode?.questionsCount || 5)) {
+                    // Shuffle and take needed amount
+                    quizQuestions = bankQuestions.sort(() => 0.5 - Math.random()).slice(0, selectedNode?.questionsCount || 5);
+                } else {
+                    // Fallback to AI Generation
+                    quizQuestions = generateMockQuestions(selectedNode?.subject || 'General', selectedNode?.questionsCount || 5);
+                }
             }
             
             setQuestions(quizQuestions);

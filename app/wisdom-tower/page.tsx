@@ -14,7 +14,7 @@ import GoldButton from "@/components/GoldButton";
 
 function WisdomTowerPageContent() {
   const [activeTab, setActiveTab] = useState<'achievements' | 'journeys' | 'leaderboard' | 'behavior'>('achievements');
-  const { xp, level, coins, name, behaviorRecords } = useUser();
+  const { xp, level, coins, name, behaviorRecords, allUsers } = useUser();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -25,15 +25,19 @@ function WisdomTowerPageContent() {
   const xpForNextLevel = level * 1000;
   const progressPercent = Math.min((xp / xpForNextLevel) * 100, 100);
 
-  const leaderboardData = [
-    { rank: 1, name: "عمر خالد", xp: 15400, level: 15, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Omar" },
-    { rank: 2, name: "سارة أحمد", xp: 14200, level: 14, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" },
-    { rank: 3, name: "يوسف علي", xp: 13800, level: 13, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Yousef" },
-    { rank: 4, name: "نورة محمد", xp: 12500, level: 12, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Nora" },
-    { rank: 5, name: "أحمد سالم", xp: 11000, level: 11, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ahmed" },
-    // Current user rank (mocked)
-    { rank: 12, name: name || "أنت", xp: xp || 0, level: level || 1, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", isCurrentUser: true }
-  ];
+  // Dynamic Leaderboard from allUsers
+  const leaderboardData = allUsers
+    .filter(u => u.role === 'student')
+    .sort((a, b) => (b.xp || 0) - (a.xp || 0))
+    .slice(0, 10) // Top 10
+    .map((u, idx) => ({
+        rank: idx + 1,
+        name: u.name,
+        xp: u.xp || 0,
+        level: u.level || 1,
+        avatar: u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`,
+        isCurrentUser: u.name === name
+    }));
 
   if (!mounted) return null; // Prevent hydration mismatch
 
