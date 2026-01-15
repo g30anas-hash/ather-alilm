@@ -824,6 +824,22 @@ function LeadershipPalacePageContent() {
       { id: 'manage_settings', label: 'إعدادات النظام' }
   ];
 
+  useEffect(() => {
+      if (typeof window === 'undefined') return;
+      const saved = window.localStorage.getItem('admin_roles');
+      if (!saved) return;
+      try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) setAvailableRoles(parsed);
+      } catch {
+      }
+  }, []);
+
+  useEffect(() => {
+      if (typeof window === 'undefined') return;
+      window.localStorage.setItem('admin_roles', JSON.stringify(availableRoles));
+  }, [availableRoles]);
+
   const handleOpenRoleModal = (role?: any) => {
       if (role) {
           setEditingRole(role);
