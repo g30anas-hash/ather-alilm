@@ -66,23 +66,6 @@ export default function OathRoomPage() {
 
     try {
         if (isLogin) {
-            // Check for Demo Login FIRST to avoid rate limits entirely
-            if (formData.password === "password123") {
-                 const success = demoLogin(formData.email);
-                 if (success) {
-                     showToast("تم تفعيل الدخول التجريبي (محلياً)", "success");
-                     
-                     // Determine dashboard path manually since we might not have updated role in time for next render, but demoLogin sets it.
-                     let target = "/student-city";
-                     if (formData.email.includes("teacher")) target = "/teacher-hall";
-                     else if (formData.email.includes("admin")) target = "/leadership-palace";
-                     else if (formData.email.includes("parent")) target = "/parent-observatory";
-                     
-                     setTimeout(() => router.push(target), 1000);
-                     return;
-                 }
-            }
-
             // Login with Supabase
             const { data, error } = await supabase.auth.signInWithPassword({
                 email: formData.email,
@@ -90,10 +73,6 @@ export default function OathRoomPage() {
             });
 
             if (error) {
-                // Rate Limit Handler or Any Auth Error for Demo
-                // Double check demo fallback on error (just in case password wasn't "password123" but matches a fallback rule we might add later)
-                // But generally the block above handles it.
-                // Keep this for robustness if user enters different password but we want to allow demo for email? No, strict password.
                 throw error;
             }
 

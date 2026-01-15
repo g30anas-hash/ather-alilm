@@ -406,7 +406,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           { data: purchaseLogs },
           { data: supportMessages },
           { data: lessons },
-          { data: submissions }
+          { data: submissions },
+          { data: compParticipants }
         ] = await Promise.all([
           supabase.from('users').select('*'),
           supabase.from('classes').select('*'),
@@ -421,7 +422,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           supabase.from('purchase_logs').select('*'),
           supabase.from('support_messages').select('*'),
           supabase.from('lessons').select('*'),
-          supabase.from('quest_submissions').select('*')
+          supabase.from('quest_submissions').select('*'),
+          supabase.from('competition_participants').select('*')
         ]);
 
         // Map DB types to Frontend types
@@ -472,7 +474,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             questionIds: c.question_ids,
             rewards: { gold: c.reward_gold, xp: c.reward_xp },
             createdBy: c.created_by,
-            participants: [] // Fetch participants separately if needed, or join
+            participants: (compParticipants || [])
+                .filter((p: any) => p.competition_id === c.id)
+                .map((p: any) => ({
+                    studentId: p.student_id,
+                    studentName: p.student_name,
+                    score: p.score
+                }))
         }));
 
         const mappedSchedule = (schedule || []).map((s: any) => ({
@@ -1292,12 +1300,48 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
   };
 
-  const joinCompetition = (compId: string, studentId: number, studentName: string) => {
-      // ... implementation
+  const joinCompetition = async (compId: string, studentId: number, studentName: string) => {
+      // Optimistic Update
+      setState(prev => ({
+          ...prev,
+          competitions: prev.competitions.map(c => 
+              c.id === compId 
+                ? { ...c, participants: [...c.participants, { studentId, studentName, score: 0 }] }
+                : c
+          )
+      }));
+
+      // DB Insert
+      await supabase.from('competition_participants').insert([{
+          competition_id: compId,
+          student_id: studentId,
+          student_name: studentName,
+          score: 0
+      }]);
   };
 
-  const submitCompetitionResult = (compId: string, studentId: number, score: number) => {
-      // ... implementation
+  const submitCompetitionResult = async (compId: string, studentId: number, score: number) => {
+      // Optimistic Update
+      setState(prev => ({
+          ...prev,
+          competitions: prev.competitions.map(c => 
+              c.id === compId 
+                ? { ...c, participants: c.participants.map(p => p.studentId === studentId ? { ...p, score } : p) }
+                : c
+          )
+      }));
+
+      // DB Update
+      await supabase.from('competition_participants').update({ 
+          score,
+          completed_at: new Date().toISOString()
+      }).match({ competition_id: compId, student_id: studentId });
+
+      // Add Rewards (Example: 1 XP per point)
+      if (score > 0) {
+          addXP(score);
+          addCoins(Math.floor(score / 2));
+      }
   };
 
   const updateCompetitionStatus = (compId: string, status: 'active' | 'ended') => {
