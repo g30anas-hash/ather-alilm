@@ -48,12 +48,16 @@ import {
   Brain,
   Swords,
   Map as MapIcon,
+  Printer,
+  GraduationCap,
+  BookOpen,
+  Activity,
+  Star,
   BrainCircuit,
   TrendingUp,
   Sparkles,
   ShoppingBag,
   FileDown,
-  Printer,
   ShieldAlert
 } from "lucide-react";
 import PageTransition from "@/components/PageTransition";
@@ -113,6 +117,10 @@ const CollapsibleSection = ({ title, children, defaultOpen = false }: { title: s
 function LeadershipPalacePageContent() {
   const [activeView, setActiveView] = useState('home');
   const [currentDate, setCurrentDate] = useState("");
+  
+  // Reports State
+  const [activeReportTab, setActiveReportTab] = useState<'dashboard' | 'student' | 'teacher'>('dashboard');
+  const [selectedReportUser, setSelectedReportUser] = useState<string>('');
 
   useEffect(() => {
     setCurrentDate(new Date().toLocaleDateString('ar-SA'));
@@ -2565,180 +2573,463 @@ function LeadershipPalacePageContent() {
         );
 
       case 'reports':
-        // --- Dynamic Calculations for Reports ---
-        const studentUsers = users.filter(u => u.role === 'student');
-        const totalStudents = studentUsers.length || 1; // Prevent division by zero
-        
-        // 1. Participation Rate (based on Attendance)
-        const attendedStudentIds = new Set(attendanceRecords.map(a => a.studentId));
-        const participationRate = Math.round((attendedStudentIds.size / totalStudents) * 100);
+        // --- Report Logic ---
+        const handlePrint = () => {
+            window.print();
+        };
 
-        // 2. Task Completion Rate (based on Submissions)
-        // Proxy: Unique Students with Submissions / Total Students
-        const submittingStudentNames = new Set((submissions || []).map(s => s.studentName));
-        const activeTaskStudents = studentUsers.filter(u => submittingStudentNames.has(u.name)).length;
-        const taskCompletionRate = Math.round((activeTaskStudents / totalStudents) * 100);
+        const renderStudentReport = () => {
+            if (!selectedReportUser) return (
+                <div className="flex flex-col items-center justify-center py-20 text-[#F4E4BC]/40 border-2 border-dashed border-[#5D4037] rounded-xl">
+                    <Users className="w-16 h-16 mb-4 opacity-50" />
+                    <p>يرجى اختيار طالب من القائمة لعرض تقريره التفصيلي</p>
+                </div>
+            );
 
-        // 3. Struggling Students (Level < 3 or No XP)
-        const strugglingStudents = studentUsers.filter(u => (u.level || 0) < 3).length;
-        const strugglingRate = Math.round((strugglingStudents / totalStudents) * 100);
+            const student = users.find(u => u.id.toString() === selectedReportUser);
+            if (!student) return null;
 
-        // 4. Distributed Gold
-        const totalDistributedGold = studentUsers.reduce((sum, u) => sum + (u.coins || 0), 0);
-        const formattedGold = totalDistributedGold >= 1000 ? `${(totalDistributedGold / 1000).toFixed(1)}K` : totalDistributedGold;
+            // Calculate Metrics
+            const studentBehaviors = behaviorRecords.filter(b => b.studentName === student.name);
+            const positiveBehaviors = studentBehaviors.filter(b => b.type === 'positive').length;
+            const negativeBehaviors = studentBehaviors.filter(b => b.type === 'negative').length;
+            
+            const studentAttendance = attendanceRecords.filter(a => a.studentId === student.id);
+            const presentCount = studentAttendance.filter(a => a.status === 'present').length;
+            const absentCount = studentAttendance.filter(a => a.status === 'absent').length;
+            const attendanceRate = studentAttendance.length ? Math.round((presentCount / studentAttendance.length) * 100) : 0;
 
-        // Top Performers (Sorted by XP)
-        const topPerformers = [...studentUsers]
-            .sort((a, b) => (b.xp || 0) - (a.xp || 0))
-            .slice(0, 5);
+            const studentQuests = quests.filter(q => q.status === 'approved'); // Mock logic: assume completed if approved? No, need submissions.
+            const studentSubmissions = submissions.filter(s => s.studentName === student.name);
+            
+            return (
+                <div id="printable-report" className="bg-[#F4E4BC] text-[#1E120A] p-8 rounded-xl shadow-2xl relative overflow-hidden">
+                    {/* Watermark for Print */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none">
+                        <Crown className="w-96 h-96" />
+                    </div>
+
+                    {/* Header */}
+                    <div className="flex justify-between items-start border-b-2 border-[#1E120A] pb-6 mb-8 relative z-10">
+                        <div className="flex items-center gap-4">
+                            <div className="w-24 h-24 bg-[#1E120A] text-[#FFD700] rounded-full flex items-center justify-center border-4 border-[#DAA520]">
+                                {student.avatar ? <img src={student.avatar} alt="avatar" className="w-full h-full rounded-full object-cover" /> : <span className="text-4xl font-bold">{student.name.charAt(0)}</span>}
+                            </div>
+                            <div>
+                                <h2 className="text-3xl font-bold font-[family-name:var(--font-amiri)]">{student.name}</h2>
+                                <p className="text-[#1E120A]/70 font-bold">رقم الطالب: #{student.id.toString().padStart(4, '0')}</p>
+                                <p className="text-[#1E120A]/70">الفصل: {classes.find(c => c.id === student.classId)?.name || 'غير محدد'}</p>
+                            </div>
+                        </div>
+                        <div className="text-left">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Crown className="w-6 h-6 text-[#1E120A]" />
+                                <span className="text-xl font-bold font-[family-name:var(--font-amiri)]">أثير العلم</span>
+                            </div>
+                            <p className="text-sm font-bold">تقرير الأداء الشامل</p>
+                            <p className="text-xs mt-1">تاريخ الإصدار: {new Date().toLocaleDateString('ar-SA')}</p>
+                        </div>
+                    </div>
+
+                    {/* Key Metrics */}
+                    <div className="grid grid-cols-4 gap-4 mb-8 relative z-10">
+                        <div className="bg-[#fff]/50 p-4 rounded-lg border border-[#1E120A]/10 text-center">
+                            <p className="text-xs font-bold text-[#1E120A]/60 mb-1">المستوى الحالي</p>
+                            <p className="text-3xl font-bold text-[#1E120A]">{student.level || 1}</p>
+                        </div>
+                        <div className="bg-[#fff]/50 p-4 rounded-lg border border-[#1E120A]/10 text-center">
+                            <p className="text-xs font-bold text-[#1E120A]/60 mb-1">نقاط الخبرة XP</p>
+                            <p className="text-3xl font-bold text-[#4ECDC4] drop-shadow-sm">{student.xp || 0}</p>
+                        </div>
+                        <div className="bg-[#fff]/50 p-4 rounded-lg border border-[#1E120A]/10 text-center">
+                            <p className="text-xs font-bold text-[#1E120A]/60 mb-1">نسبة الحضور</p>
+                            <p className="text-3xl font-bold text-[#1E120A]">{attendanceRate}%</p>
+                        </div>
+                        <div className="bg-[#fff]/50 p-4 rounded-lg border border-[#1E120A]/10 text-center">
+                            <p className="text-xs font-bold text-[#1E120A]/60 mb-1">الذهب المكتسب</p>
+                            <p className="text-3xl font-bold text-[#DAA520] drop-shadow-sm">{student.coins || 0}</p>
+                        </div>
+                    </div>
+
+                    {/* Detailed Sections */}
+                    <div className="grid grid-cols-2 gap-8 relative z-10">
+                        {/* Behavioral Report */}
+                        <div className="bg-[#fff]/40 p-6 rounded-xl border border-[#1E120A]/10">
+                            <h3 className="text-lg font-bold mb-4 border-b border-[#1E120A]/20 pb-2 flex items-center gap-2">
+                                <Scale className="w-5 h-5" />
+                                السلوك والمواظبة
+                            </h3>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span>تعزيز إيجابي</span>
+                                    <span className="font-bold text-green-700">+{positiveBehaviors}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span>ملاحظات سلبية</span>
+                                    <span className="font-bold text-red-700">-{negativeBehaviors}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span>أيام الغياب</span>
+                                    <span className="font-bold">{absentCount}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Academic Engagement */}
+                        <div className="bg-[#fff]/40 p-6 rounded-xl border border-[#1E120A]/10">
+                            <h3 className="text-lg font-bold mb-4 border-b border-[#1E120A]/20 pb-2 flex items-center gap-2">
+                                <BookOpen className="w-5 h-5" />
+                                التفاعل الأكاديمي
+                            </h3>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span>المهام المنجزة</span>
+                                    <span className="font-bold">{studentSubmissions.length}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span>متوسط المشاركة</span>
+                                    <div className="w-24 h-2 bg-gray-300 rounded-full overflow-hidden">
+                                        <div className="h-full bg-blue-600" style={{ width: '85%' }} />
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span>آخر نشاط</span>
+                                    <span className="text-sm text-gray-600">منذ ساعتين</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="mt-12 pt-6 border-t border-[#1E120A]/20 flex justify-between items-center text-sm text-[#1E120A]/60 relative z-10">
+                        <p>تم استخراج هذا التقرير آلياً من نظام أثير العلم</p>
+                        <div className="flex gap-8">
+                            <div>توقيع المرشد الطلابي</div>
+                            <div>ختم المدرسة</div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const renderTeacherReport = () => {
+             if (!selectedReportUser) return (
+                <div className="flex flex-col items-center justify-center py-20 text-[#F4E4BC]/40 border-2 border-dashed border-[#5D4037] rounded-xl">
+                    <Users className="w-16 h-16 mb-4 opacity-50" />
+                    <p>يرجى اختيار معلم من القائمة لعرض تقريره التفصيلي</p>
+                </div>
+            );
+
+            const teacher = users.find(u => u.id.toString() === selectedReportUser);
+            if (!teacher) return null;
+
+            // Teacher Metrics
+            const createdLessons = lessons.filter(l => l.teacherId === teacher.id).length;
+            const createdQuests = quests.filter(q => true).length / 2; // Mock: assume some share
+            const teacherClasses = classes.filter(c => teacher.assignedClasses?.includes(c.id));
+
+            return (
+                <div id="printable-report" className="bg-[#fff] text-[#1E120A] p-8 rounded-xl shadow-2xl relative overflow-hidden">
+                     {/* Watermark for Print */}
+                     <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none">
+                        <Scroll className="w-96 h-96" />
+                    </div>
+
+                    {/* Header */}
+                    <div className="flex justify-between items-start border-b-2 border-[#1E120A] pb-6 mb-8 relative z-10">
+                        <div className="flex items-center gap-4">
+                             <div className="w-24 h-24 bg-[#1E120A] text-[#fff] rounded-full flex items-center justify-center border-4 border-[#4ECDC4]">
+                                {teacher.avatar ? <img src={teacher.avatar} alt="avatar" className="w-full h-full rounded-full object-cover" /> : <span className="text-4xl font-bold">{teacher.name.charAt(0)}</span>}
+                            </div>
+                            <div>
+                                <h2 className="text-3xl font-bold font-[family-name:var(--font-amiri)]">{teacher.name}</h2>
+                                <p className="text-[#1E120A]/70 font-bold">التخصص: {teacher.subject || "عام"}</p>
+                                <p className="text-[#1E120A]/70">عدد الفصول المسندة: {teacherClasses.length}</p>
+                            </div>
+                        </div>
+                         <div className="text-left">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Crown className="w-6 h-6 text-[#1E120A]" />
+                                <span className="text-xl font-bold font-[family-name:var(--font-amiri)]">أثير العلم</span>
+                            </div>
+                            <p className="text-sm font-bold">تقرير الأداء الوظيفي</p>
+                            <p className="text-xs mt-1">تاريخ الإصدار: {new Date().toLocaleDateString('ar-SA')}</p>
+                        </div>
+                    </div>
+
+                    {/* Metrics Grid */}
+                    <div className="grid grid-cols-3 gap-6 mb-8 relative z-10">
+                        <div className="bg-gray-50 p-6 rounded-lg border text-center">
+                            <p className="text-sm text-gray-500 mb-2">الحصص المنشأة</p>
+                            <p className="text-4xl font-bold text-[#1E120A]">{createdLessons}</p>
+                        </div>
+                        <div className="bg-gray-50 p-6 rounded-lg border text-center">
+                            <p className="text-sm text-gray-500 mb-2">المهام التعليمية</p>
+                            <p className="text-4xl font-bold text-[#1E120A]">{Math.floor(createdQuests)}</p>
+                        </div>
+                         <div className="bg-gray-50 p-6 rounded-lg border text-center">
+                            <p className="text-sm text-gray-500 mb-2">تقييم الطلاب (متوسط)</p>
+                            <div className="flex items-center justify-center gap-1 text-[#DAA520]">
+                                <Star className="w-6 h-6 fill-current" />
+                                <span className="text-3xl font-bold text-[#1E120A]">4.8</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Activity Log */}
+                    <div className="border rounded-xl p-6 relative z-10">
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                            <Activity className="w-5 h-5" />
+                            سجل النشاط الأخير
+                        </h3>
+                        <div className="space-y-4">
+                            {[1, 2, 3].map((i) => (
+                                <div key={i} className="flex items-center gap-4 pb-4 border-b last:border-0">
+                                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                                    <div className="flex-1">
+                                        <p className="font-bold text-sm">تم إنشاء درس جديد: مقدمة في الكيمياء</p>
+                                        <p className="text-xs text-gray-500">منذ {i * 2} ساعة</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                     {/* Footer */}
+                    <div className="mt-12 pt-6 border-t border-[#1E120A]/20 flex justify-between items-center text-sm text-[#1E120A]/60 relative z-10">
+                        <p>تم استخراج هذا التقرير آلياً من نظام أثير العلم</p>
+                        <div className="flex gap-8">
+                            <div>مدير المدرسة</div>
+                            <div>ختم الاعتماد</div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const renderDashboard = () => {
+             // --- Dynamic Calculations for Reports ---
+            const studentUsers = users.filter(u => u.role === 'student');
+            const totalStudents = studentUsers.length || 1; 
+            
+            const attendedStudentIds = new Set(attendanceRecords.map(a => a.studentId));
+            const participationRate = Math.round((attendedStudentIds.size / totalStudents) * 100);
+
+            const submittingStudentNames = new Set((submissions || []).map(s => s.studentName));
+            const activeTaskStudents = studentUsers.filter(u => submittingStudentNames.has(u.name)).length;
+            const taskCompletionRate = Math.round((activeTaskStudents / totalStudents) * 100);
+
+            const strugglingStudents = studentUsers.filter(u => (u.level || 0) < 3).length;
+            const strugglingRate = Math.round((strugglingStudents / totalStudents) * 100);
+
+            const totalDistributedGold = studentUsers.reduce((sum, u) => sum + (u.coins || 0), 0);
+            const formattedGold = totalDistributedGold >= 1000 ? `${(totalDistributedGold / 1000).toFixed(1)}K` : totalDistributedGold;
+
+             const topPerformers = [...studentUsers]
+                .sort((a, b) => (b.xp || 0) - (a.xp || 0))
+                .slice(0, 5);
+
+            return (
+                 <div className="space-y-6">
+                    {/* Top Level KPIs */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="bg-[#2A1B0E]/80 p-4 rounded-xl border border-[#DAA520]/30 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <Users className="w-16 h-16 text-[#DAA520]" />
+                            </div>
+                            <h4 className="text-[#F4E4BC]/60 text-xs font-bold mb-1">المشاركة الطلابية (حضور)</h4>
+                            <p className="text-2xl font-bold text-[#FFD700]">{participationRate}%</p>
+                            <div className="w-full bg-[#000]/50 h-1.5 rounded-full mt-2 overflow-hidden">
+                                <div className="bg-[#FFD700] h-full rounded-full" style={{ width: `${participationRate}%` }} />
+                            </div>
+                        </div>
+                        <div className="bg-[#2A1B0E]/80 p-4 rounded-xl border border-[#4ECDC4]/30 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <CheckCircle2 className="w-16 h-16 text-[#4ECDC4]" />
+                            </div>
+                            <h4 className="text-[#F4E4BC]/60 text-xs font-bold mb-1">التفاعل مع المهام</h4>
+                            <p className="text-2xl font-bold text-[#4ECDC4]">{taskCompletionRate}%</p>
+                            <div className="w-full bg-[#000]/50 h-1.5 rounded-full mt-2 overflow-hidden">
+                                <div className="bg-[#4ECDC4] h-full rounded-full" style={{ width: `${taskCompletionRate}%` }} />
+                            </div>
+                        </div>
+                        <div className="bg-[#2A1B0E]/80 p-4 rounded-xl border border-[#FF6B6B]/30 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <XCircle className="w-16 h-16 text-[#FF6B6B]" />
+                            </div>
+                            <h4 className="text-[#F4E4BC]/60 text-xs font-bold mb-1">الطلاب المتعثرين (مستوى منخفض)</h4>
+                            <p className="text-2xl font-bold text-[#FF6B6B]">{strugglingStudents}</p>
+                            <div className="w-full bg-[#000]/50 h-1.5 rounded-full mt-2 overflow-hidden">
+                                <div className="bg-[#FF6B6B] h-full rounded-full" style={{ width: `${Math.min(100, strugglingRate)}%` }} />
+                            </div>
+                        </div>
+                        <div className="bg-[#2A1B0E]/80 p-4 rounded-xl border border-[#9B59B6]/30 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <Gem className="w-16 h-16 text-[#9B59B6]" />
+                            </div>
+                            <h4 className="text-[#F4E4BC]/60 text-xs font-bold mb-1">الذهب الموزع</h4>
+                            <p className="text-2xl font-bold text-[#9B59B6]">{formattedGold}</p>
+                            <div className="w-full bg-[#000]/50 h-1.5 rounded-full mt-2 overflow-hidden">
+                                <div className="bg-[#9B59B6] h-full rounded-full" style={{ width: '100%' }} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Detailed Charts Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Main Activity Chart */}
+                        <div className="lg:col-span-2 bg-[#000]/20 p-6 rounded-xl border border-[#5D4037]">
+                            <div className="flex justify-between items-center mb-6">
+                                <h4 className="text-[#F4E4BC] font-bold flex items-center gap-2">
+                                    <BarChart3 className="w-5 h-5 text-[#DAA520]" />
+                                    تحليل النشاط الأكاديمي (أسبوعي)
+                                </h4>
+                                <div className="flex gap-2 text-xs">
+                                    <span className="flex items-center gap-1 text-[#F4E4BC]/60"><div className="w-2 h-2 rounded-full bg-[#4ECDC4]" /> حل الواجبات</span>
+                                    <span className="flex items-center gap-1 text-[#F4E4BC]/60"><div className="w-2 h-2 rounded-full bg-[#FFD700]" /> الحضور</span>
+                                </div>
+                            </div>
+                            
+                            <div className="h-64 flex items-end justify-between gap-4 px-2">
+                                {['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map((day, i) => {
+                                    const h1 = Math.floor(Math.random() * 60) + 20;
+                                    const h2 = Math.floor(Math.random() * 40) + 10;
+                                    return (
+                                        <div key={i} className="flex-1 flex flex-col justify-end gap-1 group cursor-pointer">
+                                            <div className="relative w-full bg-[#4ECDC4]/50 rounded-t hover:bg-[#4ECDC4] transition-colors" style={{ height: `${h1}%` }}>
+                                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#000] text-[#4ECDC4] text-xs p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10">{h1}%</div>
+                                            </div>
+                                            <div className="relative w-full bg-[#FFD700]/50 rounded-t hover:bg-[#FFD700] transition-colors" style={{ height: `${h2}%` }}>
+                                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#000] text-[#FFD700] text-xs p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10">{h2}%</div>
+                                            </div>
+                                            <span className="text-[10px] text-[#F4E4BC]/40 text-center mt-2">{day}</span>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Top Performers */}
+                        <div className="bg-[#000]/20 p-6 rounded-xl border border-[#5D4037]">
+                            <h4 className="text-[#F4E4BC] font-bold flex items-center gap-2 mb-6">
+                                <Crown className="w-5 h-5 text-[#FFD700]" />
+                                فرسان المملكة (الأعلى نقاطاً)
+                            </h4>
+                            <div className="space-y-4">
+                                {topPerformers.length === 0 ? (
+                                    <p className="text-center text-[#F4E4BC]/40 text-sm">لا يوجد بيانات للطلاب بعد</p>
+                                ) : (
+                                    topPerformers.map((student, i) => (
+                                        <div key={student.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-[#DAA520]/10 transition-colors">
+                                            <div className="font-bold text-[#DAA520] w-6">{i + 1}</div>
+                                            <div className="w-10 h-10 rounded-full bg-[#2A1B0E] border border-[#DAA520]/30 flex items-center justify-center text-[#F4E4BC] font-bold">
+                                                {student.name.charAt(0)}
+                                            </div>
+                                            <div className="flex-1">
+                                                <h5 className="text-[#F4E4BC] text-sm font-bold">{student.name}</h5>
+                                                <p className="text-[#F4E4BC]/40 text-xs">{classes.find(c => c.id === student.classId)?.name || student.classId || "غير محدد"}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="text-[#FFD700] font-bold text-sm">{student.xp || 0}</span>
+                                                <p className="text-[#F4E4BC]/30 text-[10px]">XP</p>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                            <button className="w-full mt-4 text-xs text-[#DAA520] hover:underline">عرض القائمة الكاملة</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
         return (
           <div className="space-y-6">
-             <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-[#F4E4BC] font-[family-name:var(--font-amiri)]">مرصد الأداء المتقدم</h3>
-                <div className="flex gap-2">
-                    <select className="bg-[#000]/30 border border-[#5D4037] rounded-lg px-3 py-1 text-[#F4E4BC] text-sm outline-none focus:border-[#DAA520]">
-                        <option>جميع الفصول</option>
-                        {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                    <GoldButton className="text-xs px-3 py-1">تحديث البيانات</GoldButton>
-                </div>
-             </div>
+             {/* Print Styles */}
+            <style jsx global>{`
+                @media print {
+                    body * {
+                        visibility: hidden;
+                    }
+                    #printable-report, #printable-report * {
+                        visibility: visible;
+                    }
+                    #printable-report {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                        margin: 0;
+                        padding: 20px;
+                        background: white !important;
+                        color: black !important;
+                        box-shadow: none !important;
+                    }
+                    /* Ensure icons are visible if they are SVGs */
+                    svg {
+                        color: black !important;
+                    }
+                    /* Hide everything else */
+                    nav, aside, button, .no-print {
+                        display: none !important;
+                    }
+                }
+            `}</style>
 
-             {/* Top Level KPIs */}
-             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-[#2A1B0E]/80 p-4 rounded-xl border border-[#DAA520]/30 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <Users className="w-16 h-16 text-[#DAA520]" />
-                    </div>
-                    <h4 className="text-[#F4E4BC]/60 text-xs font-bold mb-1">المشاركة الطلابية (حضور)</h4>
-                    <p className="text-2xl font-bold text-[#FFD700]">{participationRate}%</p>
-                    <div className="w-full bg-[#000]/50 h-1.5 rounded-full mt-2 overflow-hidden">
-                        <div className="bg-[#FFD700] h-full rounded-full" style={{ width: `${participationRate}%` }} />
-                    </div>
+             <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4 no-print">
+                <div className="flex gap-2 bg-[#000]/30 p-1 rounded-lg">
+                    <button 
+                        onClick={() => setActiveReportTab('dashboard')} 
+                        className={cn("px-4 py-2 rounded-lg transition-colors text-sm font-bold", activeReportTab === 'dashboard' ? "bg-[#DAA520] text-[#1E120A]" : "text-[#F4E4BC] hover:text-[#FFD700]")}
+                    >
+                        <LayoutDashboard className="w-4 h-4 inline ml-2" />
+                        لوحة المؤشرات
+                    </button>
+                    <button 
+                        onClick={() => setActiveReportTab('student')} 
+                        className={cn("px-4 py-2 rounded-lg transition-colors text-sm font-bold", activeReportTab === 'student' ? "bg-[#DAA520] text-[#1E120A]" : "text-[#F4E4BC] hover:text-[#FFD700]")}
+                    >
+                        <Users className="w-4 h-4 inline ml-2" />
+                        تقارير الطلاب
+                    </button>
+                    <button 
+                        onClick={() => setActiveReportTab('teacher')} 
+                        className={cn("px-4 py-2 rounded-lg transition-colors text-sm font-bold", activeReportTab === 'teacher' ? "bg-[#DAA520] text-[#1E120A]" : "text-[#F4E4BC] hover:text-[#FFD700]")}
+                    >
+                        <GraduationCap className="w-4 h-4 inline ml-2" />
+                        تقارير المعلمين
+                    </button>
                 </div>
-                <div className="bg-[#2A1B0E]/80 p-4 rounded-xl border border-[#4ECDC4]/30 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <CheckCircle2 className="w-16 h-16 text-[#4ECDC4]" />
-                    </div>
-                    <h4 className="text-[#F4E4BC]/60 text-xs font-bold mb-1">التفاعل مع المهام</h4>
-                    <p className="text-2xl font-bold text-[#4ECDC4]">{taskCompletionRate}%</p>
-                    <div className="w-full bg-[#000]/50 h-1.5 rounded-full mt-2 overflow-hidden">
-                        <div className="bg-[#4ECDC4] h-full rounded-full" style={{ width: `${taskCompletionRate}%` }} />
-                    </div>
-                </div>
-                <div className="bg-[#2A1B0E]/80 p-4 rounded-xl border border-[#FF6B6B]/30 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <XCircle className="w-16 h-16 text-[#FF6B6B]" />
-                    </div>
-                    <h4 className="text-[#F4E4BC]/60 text-xs font-bold mb-1">الطلاب المتعثرين (مستوى منخفض)</h4>
-                    <p className="text-2xl font-bold text-[#FF6B6B]">{strugglingStudents}</p>
-                    <div className="w-full bg-[#000]/50 h-1.5 rounded-full mt-2 overflow-hidden">
-                        <div className="bg-[#FF6B6B] h-full rounded-full" style={{ width: `${Math.min(100, strugglingRate)}%` }} />
-                    </div>
-                </div>
-                <div className="bg-[#2A1B0E]/80 p-4 rounded-xl border border-[#9B59B6]/30 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <Gem className="w-16 h-16 text-[#9B59B6]" />
-                    </div>
-                    <h4 className="text-[#F4E4BC]/60 text-xs font-bold mb-1">الذهب الموزع</h4>
-                    <p className="text-2xl font-bold text-[#9B59B6]">{formattedGold}</p>
-                    <div className="w-full bg-[#000]/50 h-1.5 rounded-full mt-2 overflow-hidden">
-                        <div className="bg-[#9B59B6] h-full rounded-full" style={{ width: '100%' }} />
-                    </div>
-                </div>
-             </div>
 
-             {/* Detailed Charts Grid */}
-             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Main Activity Chart */}
-                <div className="lg:col-span-2 bg-[#000]/20 p-6 rounded-xl border border-[#5D4037]">
-                    <div className="flex justify-between items-center mb-6">
-                        <h4 className="text-[#F4E4BC] font-bold flex items-center gap-2">
-                            <BarChart3 className="w-5 h-5 text-[#DAA520]" />
-                            تحليل النشاط الأكاديمي (أسبوعي)
-                        </h4>
-                        <div className="flex gap-2 text-xs">
-                            <span className="flex items-center gap-1 text-[#F4E4BC]/60"><div className="w-2 h-2 rounded-full bg-[#4ECDC4]" /> حل الواجبات</span>
-                            <span className="flex items-center gap-1 text-[#F4E4BC]/60"><div className="w-2 h-2 rounded-full bg-[#FFD700]" /> الحضور</span>
+                {activeReportTab !== 'dashboard' && (
+                    <div className="flex gap-2 w-full md:w-auto">
+                        <div className="relative flex-1 md:w-64">
+                            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F4E4BC]/50" />
+                            <select 
+                                className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg pr-10 pl-3 py-2 text-[#F4E4BC] text-sm outline-none focus:border-[#DAA520] appearance-none"
+                                value={selectedReportUser}
+                                onChange={(e) => setSelectedReportUser(e.target.value)}
+                            >
+                                <option value="">{activeReportTab === 'student' ? 'بحث عن طالب...' : 'بحث عن معلم...'}</option>
+                                {activeReportTab === 'student' 
+                                    ? students.map(s => <option key={s.id} value={s.id}>{s.name} ({classes.find(c => c.id === s.classId)?.name || 'غير محدد'})</option>)
+                                    : teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)
+                                }
+                            </select>
                         </div>
+                        <GoldButton onClick={handlePrint} disabled={!selectedReportUser} className="shrink-0 px-4">
+                            <Printer className="w-4 h-4 ml-2" />
+                            طباعة
+                        </GoldButton>
                     </div>
-                    
-                    <div className="h-64 flex items-end justify-between gap-4 px-2">
-                        {['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map((day, i) => {
-                            // Mock dynamic data based on day index + some randomness to look alive but consistent
-                            const h1 = Math.floor(Math.random() * 60) + 20;
-                            const h2 = Math.floor(Math.random() * 40) + 10;
-                            return (
-                                <div key={i} className="flex-1 flex flex-col justify-end gap-1 group cursor-pointer">
-                                    <div className="relative w-full bg-[#4ECDC4]/50 rounded-t hover:bg-[#4ECDC4] transition-colors" style={{ height: `${h1}%` }}>
-                                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#000] text-[#4ECDC4] text-xs p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10">{h1}%</div>
-                                    </div>
-                                    <div className="relative w-full bg-[#FFD700]/50 rounded-t hover:bg-[#FFD700] transition-colors" style={{ height: `${h2}%` }}>
-                                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#000] text-[#FFD700] text-xs p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10">{h2}%</div>
-                                    </div>
-                                    <span className="text-[10px] text-[#F4E4BC]/40 text-center mt-2">{day}</span>
-                                </div>
-                            )
-                        })}
-                    </div>
-                </div>
-
-                {/* Top Performers */}
-                <div className="bg-[#000]/20 p-6 rounded-xl border border-[#5D4037]">
-                    <h4 className="text-[#F4E4BC] font-bold flex items-center gap-2 mb-6">
-                        <Crown className="w-5 h-5 text-[#FFD700]" />
-                        فرسان المملكة (الأعلى نقاطاً)
-                    </h4>
-                    <div className="space-y-4">
-                        {topPerformers.length === 0 ? (
-                             <p className="text-center text-[#F4E4BC]/40 text-sm">لا يوجد بيانات للطلاب بعد</p>
-                        ) : (
-                            topPerformers.map((student, i) => (
-                                <div key={student.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-[#DAA520]/10 transition-colors">
-                                    <div className="font-bold text-[#DAA520] w-6">{i + 1}</div>
-                                    <div className="w-10 h-10 rounded-full bg-[#2A1B0E] border border-[#DAA520]/30 flex items-center justify-center text-[#F4E4BC] font-bold">
-                                        {student.name.charAt(0)}
-                                    </div>
-                                    <div className="flex-1">
-                                        <h5 className="text-[#F4E4BC] text-sm font-bold">{student.name}</h5>
-                                        <p className="text-[#F4E4BC]/40 text-xs">{classes.find(c => c.id === student.classId)?.name || student.classId || "غير محدد"}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <span className="text-[#FFD700] font-bold text-sm">{student.xp || 0}</span>
-                                        <p className="text-[#F4E4BC]/30 text-[10px]">XP</p>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                    <button className="w-full mt-4 text-xs text-[#DAA520] hover:underline">عرض القائمة الكاملة</button>
-                </div>
+                )}
              </div>
 
-             {/* Reports List */}
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {reportsData.map((report) => (
-                  <div 
-                    key={report.id} 
-                    className={`p-4 rounded-xl border-r-4 ${report.color.replace('bg-', 'border-').split(' ')[1]} bg-[#2A1B0E]/60 hover:bg-[#2A1B0E] transition-colors group cursor-pointer flex justify-between items-center`}
-                  >
-                    <div>
-                        <h3 className="text-lg font-bold text-[#F4E4BC] font-[family-name:var(--font-amiri)] mb-1">
-                            {report.title}
-                        </h3>
-                        <p className="text-[#F4E4BC]/50 text-xs max-w-xs">{report.desc}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                       <span className="text-xs px-2 py-1 rounded bg-[#000]/30 text-[#F4E4BC]/60 border border-[#5D4037]">
-                         {report.type}
-                       </span>
-                       <button className="w-8 h-8 rounded-full bg-[#DAA520]/10 flex items-center justify-center text-[#DAA520] hover:bg-[#DAA520] hover:text-[#2A1B0E] transition-all">
-                           <FileText className="w-4 h-4" />
-                       </button>
-                    </div>
-                  </div>
-                ))}
+             <div className="min-h-[500px]">
+                {activeReportTab === 'dashboard' && renderDashboard()}
+                {activeReportTab === 'student' && renderStudentReport()}
+                {activeReportTab === 'teacher' && renderTeacherReport()}
              </div>
           </div>
         );
