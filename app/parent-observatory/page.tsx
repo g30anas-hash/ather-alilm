@@ -189,6 +189,10 @@ function ParentObservatoryContent() {
                     <p className="text-[#F4E4BC] text-sm">أداء {selectedChild?.name.split(' ')[0]} في "الرياضيات" متميز هذا الأسبوع. شجعه بمكافأة صغيرة!</p>
                   </div>
               </div>
+              
+              <div className="max-w-6xl mx-auto w-full mb-8">
+                <SchoolPulse />
+              </div>
 
               <GameCard className="bg-[#2A1B0E]/90 p-8 relative overflow-hidden min-h-[500px]">
                 <AnimatePresence mode="wait">
@@ -443,7 +447,9 @@ function ParentObservatoryContent() {
   );
 }
 
-export default function ParentObservatoryPage() {
+import SchoolPulse from "@/components/SchoolPulse";
+
+export default function ParentObservatory() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#0a192f] flex items-center justify-center text-[#4ECDC4]">جاري تحميل المرصد...</div>}>
       <ParentObservatoryContent />

@@ -1201,6 +1201,7 @@ function LeadershipPalacePageContent() {
       case 'home':
         return (
           <div className="space-y-6">
+            <SchoolPulse />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {stats.map((stat, idx) => (
                 <div key={idx} className="bg-[#000]/30 p-4 rounded-xl border border-[#5D4037] flex flex-col items-center">
@@ -4632,7 +4633,9 @@ function LeadershipPalacePageContent() {
   );
 }
 
-export default function LeadershipPalacePage() {
+import SchoolPulse from "@/components/SchoolPulse";
+
+export default function LeadershipPalace() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-[#DAA520]">جاري التحميل...</div>}>
       <LeadershipPalacePageContent />

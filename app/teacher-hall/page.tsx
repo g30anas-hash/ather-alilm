@@ -789,6 +789,7 @@ function TeacherHallPageInner() {
       case 'overview':
         return (
           <div className="space-y-6">
+             <SchoolPulse />
              {/* Stats Cards */}
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
@@ -2690,7 +2691,9 @@ function TeacherHallPageInner() {
   );
 }
 
-export default function TeacherHallPage() {
+import SchoolPulse from "@/components/SchoolPulse";
+
+export default function TeacherHall() {
   return (
     <Suspense fallback={null}>
       <TeacherHallPageInner />

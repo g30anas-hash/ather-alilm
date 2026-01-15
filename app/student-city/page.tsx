@@ -21,6 +21,8 @@ import NotificationCenter from "@/components/NotificationCenter";
 import AtherMind from "@/components/AtherMind";
 import FantasyModal from "@/components/FantasyModal";
 
+import SchoolPulse from "@/components/SchoolPulse";
+
 function StudentCityPageInner() {
   const { name, coins, spendCoins, addCoins, addXP, badges, broadcasts, notifications, markNotificationAsRead, addSupportMessage, allUsers, classes, logout, lessons } = useUser();
   const { showToast } = useToast();
@@ -261,6 +263,7 @@ function StudentCityPageInner() {
       // Default Dashboard
       return (
           <div className="flex flex-col gap-8">
+             <SchoolPulse />
              {/* Night Challenge Banner */}
              {nightQuestions.length > 0 && (
                  <div className="bg-gradient-to-r from-[#1E120A] to-[#2A1B0E] p-1 rounded-2xl border border-[#DAA520]/50 shadow-[0_0_30px_rgba(218,165,32,0.2)] relative overflow-hidden group cursor-pointer" onClick={() => setShowNightChallenge(true)}>
