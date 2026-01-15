@@ -36,6 +36,19 @@ function StudentCityPageInner() {
   const [currentChallengeQuestion, setCurrentChallengeQuestion] = useState(0);
   const [challengeAnswers, setChallengeAnswers] = useState<Record<string, string>>({});
   const [challengeScore, setChallengeScore] = useState<number | null>(null);
+  const [isChallengeCompleted, setIsChallengeCompleted] = useState(false);
+
+  useEffect(() => {
+      // Check if challenge is already completed for today
+      if (typeof window !== 'undefined' && name) {
+          const key = `night_challenge_${name}_${new Date().toDateString()}`;
+          if (localStorage.getItem(key)) {
+              setIsChallengeCompleted(true);
+          } else {
+              setIsChallengeCompleted(false);
+          }
+      }
+  }, [name]);
 
   const [contactForm, setContactForm] = useState({
       teacherId: "",
@@ -265,7 +278,7 @@ function StudentCityPageInner() {
           <div className="flex flex-col gap-8">
              <SchoolPulse />
              {/* Night Challenge Banner */}
-             {nightQuestions.length > 0 && (
+             {nightQuestions.length > 0 && !isChallengeCompleted && (
                  <div className="bg-gradient-to-r from-[#1E120A] to-[#2A1B0E] p-1 rounded-2xl border border-[#DAA520]/50 shadow-[0_0_30px_rgba(218,165,32,0.2)] relative overflow-hidden group cursor-pointer" onClick={() => setShowNightChallenge(true)}>
                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20 animate-pulse" />
                     <div className="bg-[#000]/40 backdrop-blur-sm p-6 rounded-xl flex items-center justify-between relative z-10">
@@ -727,6 +740,10 @@ function StudentCityPageInner() {
                              setChallengeAnswers({});
                              addXP(challengeScore);
                              addCoins(Math.floor(challengeScore / 2));
+                             
+                             // Mark as completed
+                             localStorage.setItem(`night_challenge_${name}_${new Date().toDateString()}`, 'true');
+                             setIsChallengeCompleted(true);
                          }} className="px-12 py-3 text-lg">
                              استلم الجائزة
                          </GoldButton>
