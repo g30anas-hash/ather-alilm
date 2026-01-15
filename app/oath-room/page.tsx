@@ -73,6 +73,25 @@ export default function OathRoomPage() {
             });
 
             if (error) {
+                // Check if it's a demo user login attempt that failed (likely due to missing Auth user)
+                const isDemoUser = ['student@ather.com', 'teacher@ather.com', 'admin@ather.com', 'parent@ather.com'].includes(formData.email);
+                
+                if (isDemoUser && error.message === 'Invalid login credentials') {
+                    // Fallback to Demo Login
+                    const success = demoLogin(formData.email);
+                    if (success) {
+                        showToast("تم الدخول للحساب التجريبي بنجاح!", "success");
+                        // Determine role based on email for redirection
+                        let rolePath = "/student-city";
+                        if (formData.email.includes('teacher')) rolePath = "/teacher-hall";
+                        else if (formData.email.includes('admin')) rolePath = "/leadership-palace";
+                        else if (formData.email.includes('parent')) rolePath = "/parent-observatory";
+                        
+                        setTimeout(() => router.push(rolePath), 1000);
+                        return;
+                    }
+                }
+                
                 throw error;
             }
 
@@ -359,6 +378,50 @@ export default function OathRoomPage() {
                                     {isLogin ? "ليس لديك ختم ملكي؟ اطلب الانضمام" : "لديك ختم بالفعل؟ اعبر الآن"}
                                 </button>
                             </div>
+
+                            {isLogin && (
+                                <div className="mt-6 pt-6 border-t border-[#5D4037]/50">
+                                    <p className="text-[#F4E4BC]/60 text-xs mb-3 text-center">دخول سريع (تجريبي)</p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button 
+                                            onClick={() => {
+                                                setFormData({ ...formData, email: 'student@ather.com', password: 'password' });
+                                                showToast("تم ملء بيانات الطالب", "info");
+                                            }}
+                                            className="bg-[#2A1B0E] hover:bg-[#DAA520]/20 text-[#F4E4BC] hover:text-[#FFD700] text-xs py-2 rounded border border-[#5D4037] transition-colors"
+                                        >
+                                            طالب
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                setFormData({ ...formData, email: 'teacher@ather.com', password: 'password' });
+                                                showToast("تم ملء بيانات المعلم", "info");
+                                            }}
+                                            className="bg-[#2A1B0E] hover:bg-[#DAA520]/20 text-[#F4E4BC] hover:text-[#FFD700] text-xs py-2 rounded border border-[#5D4037] transition-colors"
+                                        >
+                                            معلم
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                setFormData({ ...formData, email: 'admin@ather.com', password: 'password' });
+                                                showToast("تم ملء بيانات القائد", "info");
+                                            }}
+                                            className="bg-[#2A1B0E] hover:bg-[#DAA520]/20 text-[#F4E4BC] hover:text-[#FFD700] text-xs py-2 rounded border border-[#5D4037] transition-colors"
+                                        >
+                                            قائد
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                setFormData({ ...formData, email: 'parent@ather.com', password: 'password' });
+                                                showToast("تم ملء بيانات ولي الأمر", "info");
+                                            }}
+                                            className="bg-[#2A1B0E] hover:bg-[#DAA520]/20 text-[#F4E4BC] hover:text-[#FFD700] text-xs py-2 rounded border border-[#5D4037] transition-colors"
+                                        >
+                                            ولي أمر
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             {!selectedRole && !isLogin && (
                                 <p className="text-center text-[#FF6B6B]/80 text-xs mt-2 animate-pulse">
