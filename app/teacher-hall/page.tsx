@@ -108,7 +108,7 @@ function TeacherHallPageInner() {
   const [showBehaviorModal, setShowBehaviorModal] = useState(false);
   const [selectedBroadcast, setSelectedBroadcast] = useState<any>(null);
   const [activeMessageTab, setActiveMessageTab] = useState<'all' | 'students' | 'parents' | 'admin' | 'broadcasts'>('all');
-  const { id, name, submissions, gradeQuest, allUsers, classes, logout, addQuest, role, acceptedQuests, acceptQuest, addCoins, submitQuest, quests, addBehaviorRequest, supportMessages, markSupportMessageAsRead, addToSchedule, addToWeeklyPlan, schedule, weeklyPlan, addQuestion, questionBank, behaviorRecords, broadcasts, addLesson, lessons, addCompetition } = useUser();
+  const { id, name, submissions, gradeQuest, allUsers, classes, logout, addQuest, role, acceptedQuests, acceptQuest, addCoins, submitQuest, quests, addBehaviorRequest, supportMessages, markSupportMessageAsRead, addToSchedule, addToWeeklyPlan, schedule, weeklyPlan, addQuestion, questionBank, behaviorRecords, broadcasts, addLesson, lessons, addCompetition, addSupportMessage } = useUser();
   const { showToast } = useToast();
   const [currentDate, setCurrentDate] = useState("");
 
@@ -626,6 +626,29 @@ function TeacherHallPageInner() {
           grade: "",
           difficulty: "medium"
       });
+  };
+
+  const [replyMessage, setReplyMessage] = useState("");
+  const [showReplyInput, setShowReplyInput] = useState(false);
+
+  const handleSendReply = () => {
+      if (!replyMessage.trim() || !selectedMessage) return;
+
+      addSupportMessage({
+          senderName: name,
+          senderId: currentTeacher?.id,
+          targetId: selectedMessage.senderId, // Reply to the original sender
+          type: 'teacher_reply', // Distinct type for replies
+          message: replyMessage,
+          email: selectedMessage.email,
+          mobile: selectedMessage.mobile
+      });
+
+      showToast("تم إرسال الرد بنجاح", "success");
+      setReplyMessage("");
+      setShowReplyInput(false);
+      // Optional: Close modal or keep it open
+      // setSelectedMessage(null);
   };
 
   const navItems = [
@@ -2229,17 +2252,41 @@ function TeacherHallPageInner() {
                             </div>
 
                             {/* Footer Actions */}
-                            <div className="flex justify-end gap-3 pt-4 border-t border-[#DAA520]/30">
-                                <button 
-                                    onClick={() => handleAction("رد على الرسالة")}
-                                    className="px-4 py-2 rounded-lg border border-[#DAA520] text-[#DAA520] hover:bg-[#DAA520] hover:text-[#1E120A] transition-all font-bold flex items-center gap-2 text-sm"
-                                >
-                                    <MessageCircle className="w-4 h-4" />
-                                    <span>رد على الرسالة</span>
-                                </button>
-                                <GoldButton onClick={() => setSelectedMessage(null)} className="px-6 py-2 text-sm min-w-[100px]">
-                                    إغلاق
-                                </GoldButton>
+                            <div className="flex flex-col gap-4 pt-4 border-t border-[#DAA520]/30">
+                                {showReplyInput ? (
+                                    <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2">
+                                        <textarea
+                                            value={replyMessage}
+                                            onChange={(e) => setReplyMessage(e.target.value)}
+                                            placeholder="اكتب ردك هنا..."
+                                            className="w-full bg-[#000]/30 border border-[#DAA520]/30 rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none min-h-[100px]"
+                                        />
+                                        <div className="flex justify-end gap-2">
+                                            <button 
+                                                onClick={() => setShowReplyInput(false)}
+                                                className="px-4 py-2 text-[#F4E4BC]/60 hover:text-[#F4E4BC]"
+                                            >
+                                                إلغاء
+                                            </button>
+                                            <GoldButton onClick={handleSendReply} className="px-6 py-2 text-sm">
+                                                إرسال الرد
+                                            </GoldButton>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex justify-end gap-3">
+                                        <button 
+                                            onClick={() => setShowReplyInput(true)}
+                                            className="px-4 py-2 rounded-lg border border-[#DAA520] text-[#DAA520] hover:bg-[#DAA520] hover:text-[#1E120A] transition-all font-bold flex items-center gap-2 text-sm"
+                                        >
+                                            <MessageCircle className="w-4 h-4" />
+                                            <span>رد على الرسالة</span>
+                                        </button>
+                                        <GoldButton onClick={() => setSelectedMessage(null)} className="px-6 py-2 text-sm min-w-[100px]">
+                                            إغلاق
+                                        </GoldButton>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

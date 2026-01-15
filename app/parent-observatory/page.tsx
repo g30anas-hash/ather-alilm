@@ -20,7 +20,7 @@ import JourneyHour from "@/components/JourneyHour";
 function ParentObservatoryContent() {
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const { name, role, allUsers, logout, behaviorRecords, lessons, addSupportMessage, id } = useUser();
+  const { name, role, allUsers, logout, behaviorRecords, lessons, addSupportMessage, id, supportMessages } = useUser();
   const { showToast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -29,6 +29,9 @@ function ParentObservatoryContent() {
   const currentUser = allUsers.find(u => u.name === name && u.role === role);
   const childrenIds = currentUser?.childrenIds || [];
   const myChildren = allUsers.filter(u => childrenIds.includes(u.id));
+  
+  // Filter messages for this parent
+  const myMessages = supportMessages.filter(m => m.senderId === id || m.targetId === id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null);
 
@@ -107,10 +110,7 @@ function ParentObservatoryContent() {
     { id: 'profile', icon: <User className="w-8 h-8" />, label: "لفافة الشخصية", color: "text-[#54A0FF]", detail: `الصف: ${childStats.class}. البيانات محدثة.` },
     { id: 'rank', icon: <GraduationCap className="w-8 h-8" />, label: "مستوى القوة", color: "text-[#A3CB38]", detail: `المستوى الحالي: ${childStats.level}. استمر في التقدم!` },
     { id: 'behavior', icon: <Shield className="w-8 h-8" />, label: "ميثاق الشرف", color: "text-[#EE5A24]", detail: `سجل السلوك: ${positiveBehaviors.length} إيجابي | ${negativeBehaviors.length} ملاحظات` },
-    { id: 'subjects', icon: <BookOpen className="w-8 h-8" />, label: "فنون المعرفة", color: "text-[#12CBC4]", detail: "6 مواد مسجلة. المادة المفضلة: العلوم." },
-    { id: 'lessons', icon: <ScrollText className="w-8 h-8" />, label: "سجل الحصص", color: "text-[#DAA520]", detail: `تم توثيق ${childLessons.length} حصة دراسية.` },
-    { id: 'schedule', icon: <Map className="w-8 h-8" />, label: "خريطة الأسبوع", color: "text-[#FFD700]", detail: "جدول الحصص والخطط الأسبوعية." },
-    { id: 'competitions', icon: <Swords className="w-8 h-8" />, label: "ساحة أثير", color: "text-[#FF4757]", detail: "شارك في 3 منافسات هذا الشهر. حقق المركز الأول في الرياضيات!" },
+    { id: 'communication', icon: <Users className="w-8 h-8" />, label: "همزة الوصل", color: "text-[#12CBC4]", detail: "تواصل مباشر مع الكادر التعليمي." },
   ];
 
   const selectedData = menuItems.find(item => item.id === selectedItem);
@@ -300,6 +300,34 @@ function ParentObservatoryContent() {
                                               <div className={cn("font-bold text-sm", b.type === 'positive' ? "text-[#FFD700]" : "text-[#FF6B6B]")}>
                                                   {b.type === 'positive' ? `+${b.goldAmount}` : `-${b.goldAmount}`} 🪙
                                               </div>
+                                          </div>
+                                      ))
+                                  )}
+                              </div>
+                          </div>
+                      ) : selectedItem === 'communication' ? (
+                          <div className="w-full max-w-3xl flex flex-col gap-4 max-h-[400px]">
+                              <div className="flex justify-between items-center bg-[#000]/20 p-4 rounded-xl">
+                                  <h3 className="text-[#F4E4BC] font-bold">سجل التواصل</h3>
+                                  <GoldButton onClick={() => handleAction("تواصل مع المعلم")} className="px-4 py-2 text-sm">
+                                      <Users className="w-4 h-4 ml-2 inline" />
+                                      رسالة جديدة
+                                  </GoldButton>
+                              </div>
+                              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
+                                  {myMessages.length === 0 ? (
+                                      <p className="text-center text-[#F4E4BC]/50 py-8">لا توجد رسائل سابقة</p>
+                                  ) : (
+                                      myMessages.map((msg) => (
+                                          <div key={msg.id} className={cn(
+                                              "p-4 rounded-xl border max-w-[80%]",
+                                              msg.senderId === id ? "mr-auto bg-[#DAA520]/10 border-[#DAA520]/30 text-left" : "ml-auto bg-[#4ECDC4]/10 border-[#4ECDC4]/30 text-right"
+                                          )}>
+                                              <div className="flex justify-between items-center mb-2 gap-4">
+                                                  <span className="font-bold text-[#F4E4BC] text-sm">{msg.senderId === id ? "أنت" : msg.senderName}</span>
+                                                  <span className="text-[10px] text-[#F4E4BC]/40">{new Date(msg.date).toLocaleDateString('ar-SA')}</span>
+                                              </div>
+                                              <p className="text-[#F4E4BC]/90 text-sm leading-relaxed">{msg.message}</p>
                                           </div>
                                       ))
                                   )}
