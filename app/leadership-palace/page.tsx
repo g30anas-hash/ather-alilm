@@ -119,7 +119,7 @@ function LeadershipPalacePageContent() {
   const [currentDate, setCurrentDate] = useState("");
   
   // Reports State
-  const [activeReportTab, setActiveReportTab] = useState<'dashboard' | 'student' | 'teacher'>('dashboard');
+  const [activeReportTab, setActiveReportTab] = useState<'dashboard' | 'student' | 'teacher' | 'class'>('dashboard');
   const [selectedReportUser, setSelectedReportUser] = useState<string>('');
 
   useEffect(() => {
@@ -2944,6 +2944,109 @@ function LeadershipPalacePageContent() {
             );
         };
 
+        const renderClassReport = () => {
+             if (!selectedReportUser) return (
+                <div className="flex flex-col items-center justify-center py-20 text-[#F4E4BC]/40 border-2 border-dashed border-[#5D4037] rounded-xl">
+                    <School className="w-16 h-16 mb-4 opacity-50" />
+                    <p>يرجى اختيار فصل من القائمة لعرض تقريره التفصيلي</p>
+                </div>
+            );
+
+            const selectedClass = classes.find(c => c.id === selectedReportUser);
+            if (!selectedClass) return null;
+
+            // Class Metrics
+            const classStudents = users.filter(u => u.role === 'student' && u.classId === selectedClass.id);
+            const totalClassStudents = classStudents.length || 1;
+            const classAttendance = attendanceRecords.filter(a => classStudents.find(s => s.id === a.studentId));
+            const classAvgAttendance = classAttendance.length ? Math.round((classAttendance.filter(a => a.status === 'present').length / classAttendance.length) * 100) : 0;
+            const classTotalXP = classStudents.reduce((sum, s) => sum + (s.xp || 0), 0);
+            const classAvgXP = Math.round(classTotalXP / totalClassStudents);
+            
+            return (
+                <div id="printable-report" className="bg-[#fff] text-[#1E120A] p-8 rounded-xl shadow-2xl relative overflow-hidden">
+                     <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none">
+                        <School className="w-96 h-96" />
+                    </div>
+
+                    {/* Header */}
+                    <div className="flex justify-between items-start border-b-2 border-[#1E120A] pb-6 mb-8 relative z-10">
+                        <div className="flex items-center gap-4">
+                             <div className="w-24 h-24 bg-[#1E120A] text-[#fff] rounded-full flex items-center justify-center border-4 border-[#DAA520]">
+                                <School className="w-12 h-12" />
+                            </div>
+                            <div>
+                                <h2 className="text-3xl font-bold font-[family-name:var(--font-amiri)]">فصل: {selectedClass.name}</h2>
+                                <p className="text-[#1E120A]/70 font-bold">المرحلة: {selectedClass.grade}</p>
+                                <p className="text-[#1E120A]/70">عدد الطلاب: {totalClassStudents}</p>
+                            </div>
+                        </div>
+                         <div className="text-left">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Crown className="w-6 h-6 text-[#1E120A]" />
+                                <span className="text-xl font-bold font-[family-name:var(--font-amiri)]">أثير العلم</span>
+                            </div>
+                            <p className="text-sm font-bold">تقرير أداء الفصل</p>
+                            <p className="text-xs mt-1">تاريخ الإصدار: {new Date().toLocaleDateString('ar-SA')}</p>
+                        </div>
+                    </div>
+
+                    {/* Metrics */}
+                    <div className="grid grid-cols-3 gap-6 mb-8 relative z-10">
+                        <div className="bg-gray-50 p-6 rounded-lg border text-center">
+                            <p className="text-sm text-gray-500 mb-2">متوسط الحضور</p>
+                            <p className="text-4xl font-bold text-[#1E120A]">{classAvgAttendance}%</p>
+                        </div>
+                        <div className="bg-gray-50 p-6 rounded-lg border text-center">
+                            <p className="text-sm text-gray-500 mb-2">متوسط نقاط الخبرة XP</p>
+                            <p className="text-4xl font-bold text-[#DAA520]">{classAvgXP}</p>
+                        </div>
+                        <div className="bg-gray-50 p-6 rounded-lg border text-center">
+                            <p className="text-sm text-gray-500 mb-2">إجمالي الذهب المكتسب</p>
+                            <p className="text-4xl font-bold text-[#4ECDC4]">{classStudents.reduce((sum, s) => sum + (s.coins || 0), 0)}</p>
+                        </div>
+                    </div>
+
+                    {/* Top Students Table */}
+                    <div className="border rounded-xl p-6 relative z-10">
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                            <Star className="w-5 h-5 text-[#DAA520]" />
+                            أبرز طلاب الفصل
+                        </h3>
+                        <table className="w-full text-sm text-left rtl:text-right">
+                            <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                                <tr>
+                                    <th className="px-6 py-3">الطالب</th>
+                                    <th className="px-6 py-3">المستوى</th>
+                                    <th className="px-6 py-3">XP</th>
+                                    <th className="px-6 py-3">الذهب</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {classStudents.sort((a,b) => (b.xp || 0) - (a.xp || 0)).slice(0, 5).map(student => (
+                                    <tr key={student.id} className="bg-white border-b">
+                                        <td className="px-6 py-4 font-bold text-[#1E120A]">{student.name}</td>
+                                        <td className="px-6 py-4">{student.level || 1}</td>
+                                        <td className="px-6 py-4 text-[#DAA520] font-bold">{student.xp || 0}</td>
+                                        <td className="px-6 py-4">{student.coins || 0}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                     {/* Footer */}
+                    <div className="mt-12 pt-6 border-t border-[#1E120A]/20 flex justify-between items-center text-sm text-[#1E120A]/60 relative z-10">
+                        <p>تم استخراج هذا التقرير آلياً من نظام أثير العلم</p>
+                        <div className="flex gap-8">
+                            <div>رائد الفصل</div>
+                            <div>مدير المدرسة</div>
+                        </div>
+                    </div>
+                </div>
+            )
+        }
+
         return (
           <div className="space-y-6">
              {/* Print Styles */}
@@ -2978,27 +3081,34 @@ function LeadershipPalacePageContent() {
             `}</style>
 
              <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4 no-print">
-                <div className="flex gap-2 bg-[#000]/30 p-1 rounded-lg">
+                <div className="flex gap-2 bg-[#000]/30 p-1 rounded-lg overflow-x-auto max-w-full">
                     <button 
-                        onClick={() => setActiveReportTab('dashboard')} 
-                        className={cn("px-4 py-2 rounded-lg transition-colors text-sm font-bold", activeReportTab === 'dashboard' ? "bg-[#DAA520] text-[#1E120A]" : "text-[#F4E4BC] hover:text-[#FFD700]")}
+                        onClick={() => { setActiveReportTab('dashboard'); setSelectedReportUser(''); }} 
+                        className={cn("px-4 py-2 rounded-lg transition-colors text-sm font-bold whitespace-nowrap", activeReportTab === 'dashboard' ? "bg-[#DAA520] text-[#1E120A]" : "text-[#F4E4BC] hover:text-[#FFD700]")}
                     >
                         <LayoutDashboard className="w-4 h-4 inline ml-2" />
-                        لوحة المؤشرات
+                        المؤشرات
                     </button>
                     <button 
-                        onClick={() => setActiveReportTab('student')} 
-                        className={cn("px-4 py-2 rounded-lg transition-colors text-sm font-bold", activeReportTab === 'student' ? "bg-[#DAA520] text-[#1E120A]" : "text-[#F4E4BC] hover:text-[#FFD700]")}
+                        onClick={() => { setActiveReportTab('student'); setSelectedReportUser(''); }} 
+                        className={cn("px-4 py-2 rounded-lg transition-colors text-sm font-bold whitespace-nowrap", activeReportTab === 'student' ? "bg-[#DAA520] text-[#1E120A]" : "text-[#F4E4BC] hover:text-[#FFD700]")}
                     >
                         <Users className="w-4 h-4 inline ml-2" />
-                        تقارير الطلاب
+                        الطلاب
                     </button>
                     <button 
-                        onClick={() => setActiveReportTab('teacher')} 
-                        className={cn("px-4 py-2 rounded-lg transition-colors text-sm font-bold", activeReportTab === 'teacher' ? "bg-[#DAA520] text-[#1E120A]" : "text-[#F4E4BC] hover:text-[#FFD700]")}
+                        onClick={() => { setActiveReportTab('teacher'); setSelectedReportUser(''); }} 
+                        className={cn("px-4 py-2 rounded-lg transition-colors text-sm font-bold whitespace-nowrap", activeReportTab === 'teacher' ? "bg-[#DAA520] text-[#1E120A]" : "text-[#F4E4BC] hover:text-[#FFD700]")}
                     >
                         <GraduationCap className="w-4 h-4 inline ml-2" />
-                        تقارير المعلمين
+                        المعلمين
+                    </button>
+                    <button 
+                        onClick={() => { setActiveReportTab('class'); setSelectedReportUser(''); }} 
+                        className={cn("px-4 py-2 rounded-lg transition-colors text-sm font-bold whitespace-nowrap", activeReportTab === 'class' ? "bg-[#DAA520] text-[#1E120A]" : "text-[#F4E4BC] hover:text-[#FFD700]")}
+                    >
+                        <School className="w-4 h-4 inline ml-2" />
+                        الفصول
                     </button>
                 </div>
 
@@ -3011,10 +3121,16 @@ function LeadershipPalacePageContent() {
                                 value={selectedReportUser}
                                 onChange={(e) => setSelectedReportUser(e.target.value)}
                             >
-                                <option value="">{activeReportTab === 'student' ? 'بحث عن طالب...' : 'بحث عن معلم...'}</option>
+                                <option value="">
+                                    {activeReportTab === 'student' ? 'بحث عن طالب...' : 
+                                     activeReportTab === 'teacher' ? 'بحث عن معلم...' : 
+                                     'بحث عن فصل...'}
+                                </option>
                                 {activeReportTab === 'student' 
                                     ? students.map(s => <option key={s.id} value={s.id}>{s.name} ({classes.find(c => c.id === s.classId)?.name || 'غير محدد'})</option>)
-                                    : teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)
+                                    : activeReportTab === 'teacher'
+                                    ? teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)
+                                    : classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)
                                 }
                             </select>
                         </div>
@@ -3030,6 +3146,7 @@ function LeadershipPalacePageContent() {
                 {activeReportTab === 'dashboard' && renderDashboard()}
                 {activeReportTab === 'student' && renderStudentReport()}
                 {activeReportTab === 'teacher' && renderTeacherReport()}
+                {activeReportTab === 'class' && renderClassReport()}
              </div>
           </div>
         );
