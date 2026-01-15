@@ -20,7 +20,7 @@ import JourneyHour from "@/components/JourneyHour";
 function ParentObservatoryContent() {
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const { name, role, allUsers, logout, behaviorRecords, lessons } = useUser();
+  const { name, role, allUsers, logout, behaviorRecords, lessons, addSupportMessage, id } = useUser();
   const { showToast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -70,6 +70,17 @@ function ParentObservatoryContent() {
 
   const handleSendMessage = () => {
     if (!contactMessage.trim()) return;
+    
+    addSupportMessage({
+        senderName: name,
+        email: currentUser?.email || "parent@ather.com", // Fallback or empty
+        mobile: "", // Optional now
+        type: 'inquiry',
+        message: contactMessage,
+        senderId: id,
+        targetId: undefined 
+    });
+
     showToast("تم إرسال رسالتك للمعلم بنجاح", "success");
     setContactMessage("");
     setShowContactModal(false);

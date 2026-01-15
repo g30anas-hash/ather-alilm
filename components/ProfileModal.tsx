@@ -20,9 +20,9 @@ interface ProfileModalProps {
 
 export default function ProfileModal({ isOpen, onClose, targetUserId }: ProfileModalProps) {
   const { 
-    id, name, role, coins, xp, level, badges, 
-    updateName, allUsers, behaviorRecords, submissions, quests, schedule,
-    classes
+    id, name, role, coins, xp, level, badges, avatar, frame,
+    updateName, updateAvatar, updateFrame, allUsers, behaviorRecords, submissions, quests, schedule,
+    classes, inventory
   } = useUser();
   
   const { showToast } = useToast();
@@ -30,12 +30,24 @@ export default function ProfileModal({ isOpen, onClose, targetUserId }: ProfileM
   // Determine who we are viewing
   const isSelf = !targetUserId;
   const currentUser = isSelf 
-    ? { id, name, role, coins, xp, level, badges } 
-    : allUsers.find(u => u.id === targetUserId) || { id: 0, name: "Unknown", role: "student" as UserRole, coins: 0, xp: 0, level: 1, badges: [] };
+    ? { id, name, role, coins, xp, level, badges, avatar, frame } 
+    : allUsers.find(u => u.id === targetUserId) || { id: 0, name: "Unknown", role: "student" as UserRole, coins: 0, xp: 0, level: 1, badges: [], avatar: undefined, frame: undefined };
 
   // Use local state for editing
   const [newName, setNewName] = useState(currentUser.name);
   const [activeTab, setActiveTab] = useState("identity");
+  const [showInventory, setShowInventory] = useState(false);
+
+  const handleEquip = (type: 'avatar' | 'frame', value: string) => {
+      if (type === 'avatar') {
+          updateAvatar(value);
+          showToast("تم تحديث الصورة الرمزية", "success");
+      } else {
+          updateFrame(value);
+          showToast("تم تحديث الإطار", "success");
+      }
+      setShowInventory(false);
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,8 +127,22 @@ export default function ProfileModal({ isOpen, onClose, targetUserId }: ProfileM
         <div className="relative z-10 flex flex-col md:flex-row gap-8 items-center">
             {/* Avatar */}
             <div className="relative shrink-0">
-                 <div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-[#DAA520] bg-black shadow-[0_0_40px_rgba(218,165,32,0.4)] flex items-center justify-center relative z-10 group overflow-hidden">
-                    <User className="w-20 h-20 text-[#F4E4BC]/20 group-hover:scale-110 transition-transform duration-500" />
+                 <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-black shadow-[0_0_40px_rgba(218,165,32,0.4)] flex items-center justify-center relative z-10 group overflow-hidden" style={{
+                     border: currentUser.frame ? 'none' : '4px solid #DAA520'
+                 }}>
+                    {/* Frame Layer */}
+                    {currentUser.frame && (
+                        <div className="absolute inset-0 z-20 pointer-events-none">
+                            <img src={currentUser.frame} alt="Frame" className="w-full h-full object-cover scale-110" />
+                        </div>
+                    )}
+                    
+                    {/* Avatar Image */}
+                    {currentUser.avatar ? (
+                        <img src={currentUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                        <User className="w-20 h-20 text-[#F4E4BC]/20 group-hover:scale-110 transition-transform duration-500" />
+                    )}
                  </div>
                  {/* Level Badge */}
                  <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-[#DAA520] text-[#2A1B0E] px-4 py-1 rounded-full font-bold border-2 border-[#000] shadow-lg z-20 whitespace-nowrap flex items-center gap-2">
@@ -125,8 +151,11 @@ export default function ProfileModal({ isOpen, onClose, targetUserId }: ProfileM
                  </div>
                  {/* Edit Button */}
                  {isSelf && (
-                    <button className="absolute top-0 right-0 bg-[#2A1B0E] text-[#DAA520] p-2 rounded-full border border-[#DAA520] hover:scale-110 transition-transform z-20 shadow-lg">
-                        <Scroll className="w-4 h-4" />
+                    <button 
+                        onClick={() => setShowInventory(true)}
+                        className="absolute top-0 right-0 bg-[#2A1B0E] text-[#DAA520] p-2 rounded-full border border-[#DAA520] hover:scale-110 transition-transform z-20 shadow-lg"
+                    >
+                        <Palette className="w-4 h-4" />
                     </button>
                  )}
             </div>
@@ -198,6 +227,63 @@ export default function ProfileModal({ isOpen, onClose, targetUserId }: ProfileM
              </p>
         </div>
       </div>
+      {/* Inventory/Customization Modal Overlay */}
+      <AnimatePresence>
+        {showInventory && (
+           <div className="absolute inset-0 z-[80] bg-[#050B14]/95 backdrop-blur-md flex flex-col p-6 animate-in fade-in zoom-in-95 duration-300">
+               <div className="flex justify-between items-center mb-6">
+                   <h3 className="text-2xl font-bold text-[#FFD700] font-[family-name:var(--font-amiri)]">خزانة الملابس</h3>
+                   <button onClick={() => setShowInventory(false)} className="text-[#F4E4BC]/50 hover:text-[#FF6B6B]">
+                       <X className="w-6 h-6" />
+                   </button>
+               </div>
+               
+               <div className="flex-1 overflow-y-auto custom-scrollbar">
+                   <div className="mb-8">
+                       <h4 className="text-[#4ECDC4] font-bold mb-4 flex items-center gap-2"><UserCircle className="w-5 h-5" /> الصور الرمزية</h4>
+                       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                           {/* Default Avatars */}
+                           {['https://api.dicebear.com/7.x/avataaars/svg?seed=Felix', 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka', 'https://api.dicebear.com/7.x/bottts/svg?seed=Bot'].map((url, i) => (
+                               <div key={i} onClick={() => handleEquip('avatar', url)} className="cursor-pointer bg-[#000]/40 p-2 rounded-xl border border-[#5D4037] hover:border-[#DAA520] hover:bg-[#DAA520]/10 transition-all text-center">
+                                   <img src={url} alt="Avatar" className="w-16 h-16 mx-auto mb-2 rounded-full" />
+                                   <span className="text-xs text-[#F4E4BC]/70">افتراضي {i+1}</span>
+                               </div>
+                           ))}
+                           {/* Inventory Avatars */}
+                           {inventory.filter(i => i.type === 'avatar').map(item => (
+                               <div key={item.id} onClick={() => handleEquip('avatar', item.image)} className="cursor-pointer bg-[#000]/40 p-2 rounded-xl border border-[#5D4037] hover:border-[#DAA520] hover:bg-[#DAA520]/10 transition-all text-center">
+                                   <img src={item.image} alt={item.name} className="w-16 h-16 mx-auto mb-2 rounded-full" />
+                                   <span className="text-xs text-[#F4E4BC]/70">{item.name}</span>
+                               </div>
+                           ))}
+                       </div>
+                   </div>
+
+                   <div>
+                       <h4 className="text-[#FFD700] font-bold mb-4 flex items-center gap-2"><Award className="w-5 h-5" /> الإطارات</h4>
+                       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                           <div onClick={() => handleEquip('frame', '')} className="cursor-pointer bg-[#000]/40 p-2 rounded-xl border border-[#5D4037] hover:border-[#FF6B6B] hover:bg-[#FF6B6B]/10 transition-all text-center flex flex-col items-center justify-center min-h-[120px]">
+                               <X className="w-8 h-8 text-[#FF6B6B] mb-2" />
+                               <span className="text-xs text-[#F4E4BC]/70">إزالة الإطار</span>
+                           </div>
+                           {inventory.filter(i => i.type === 'frame').map(item => (
+                               <div key={item.id} onClick={() => handleEquip('frame', item.image)} className="cursor-pointer bg-[#000]/40 p-2 rounded-xl border border-[#5D4037] hover:border-[#DAA520] hover:bg-[#DAA520]/10 transition-all text-center relative">
+                                   <div className="w-16 h-16 mx-auto mb-2 relative">
+                                       <div className="w-12 h-12 rounded-full bg-gray-700 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                                       <img src={item.image} alt={item.name} className="w-full h-full object-cover relative z-10" />
+                                   </div>
+                                   <span className="text-xs text-[#F4E4BC]/70">{item.name}</span>
+                               </div>
+                           ))}
+                           {inventory.filter(i => i.type === 'frame').length === 0 && (
+                               <div className="col-span-full text-center py-4 text-[#F4E4BC]/30">لا تملك إطارات بعد. قم بزيارة السوق!</div>
+                           )}
+                       </div>
+                   </div>
+               </div>
+           </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 

@@ -14,6 +14,8 @@ export interface UserData {
   coins?: number;
   xp?: number;
   level?: number;
+  avatar?: string;
+  frame?: string;
   badges?: Badge[];
   // Student Specific
   parentId?: number | null;
@@ -90,7 +92,7 @@ export interface SupportMessage {
 export interface InventoryItem {
   id: string;
   name: string;
-  type: 'frame' | 'badge' | 'consumable';
+  type: 'frame' | 'badge' | 'consumable' | 'avatar';
   image: string;
   dateAcquired: string;
 }
@@ -100,7 +102,7 @@ export interface MarketItem {
   name: string;
   description: string;
   price: number;
-  type: 'frame' | 'badge' | 'consumable';
+  type: 'frame' | 'badge' | 'consumable' | 'avatar';
   image: string;
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
 }
@@ -263,6 +265,8 @@ interface UserState {
   coins: number;
   xp: number;
   level: number;
+  avatar?: string;
+  frame?: string;
   acceptedQuests: number[];
   badges: Badge[];
   notifications: Notification[];
@@ -290,6 +294,8 @@ interface UserState {
 interface UserContextType extends UserState {
   setRole: (role: UserRole) => void;
   updateName: (name: string) => void;
+  updateAvatar: (avatar: string) => void;
+  updateFrame: (frame: string) => void;
   addCoins: (amount: number) => void;
   addXP: (amount: number) => boolean; // Returns true if leveled up
   spendCoins: (amount: number) => boolean;
@@ -555,6 +561,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
                         coins: mappedUser.coins, 
                         xp: mappedUser.xp, 
                         level: mappedUser.level,
+                        avatar: mappedUser.avatar,
+                        frame: mappedUser.frame,
                         badges: mappedUser.badges || [],
                         inventory: mappedUser.inventory || [],
                         notifications: mappedUser.notifications || [],
@@ -652,6 +660,36 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setState(prev => ({
             ...prev,
             allUsers: prev.allUsers.map(u => u.id === id ? { ...u, name } : u)
+        }));
+    }
+  };
+
+  const updateAvatar = async (avatar: string) => {
+    const id = getCurrentUserId();
+    setState(prev => ({ ...prev, avatar }));
+    
+    if (id) {
+        await supabase.from('users').update({ avatar }).eq('id', id);
+        
+        // Also update allUsers to keep it consistent
+        setState(prev => ({
+            ...prev,
+            allUsers: prev.allUsers.map(u => u.id === id ? { ...u, avatar } : u)
+        }));
+    }
+  };
+
+  const updateFrame = async (frame: string) => {
+    const id = getCurrentUserId();
+    setState(prev => ({ ...prev, frame }));
+    
+    if (id) {
+        await supabase.from('users').update({ frame }).eq('id', id);
+        
+        // Also update allUsers to keep it consistent
+        setState(prev => ({
+            ...prev,
+            allUsers: prev.allUsers.map(u => u.id === id ? { ...u, frame } : u)
         }));
     }
   };
@@ -1446,7 +1484,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <UserContext.Provider value={{ ...state, setRole, updateName, addCoins, addXP, spendCoins, acceptQuest, earnBadge, getDashboardPath, markNotificationAsRead, addNotification, submitQuest, gradeQuest, addUser, removeUser, updateUser, addClass, removeClass, updateClass, addStage, removeStage, logout, addQuest, updateQuestStatus, addSupportMessage, addItemToInventory, addMarketItem, removeMarketItem, addBehaviorRequest, processBehaviorRequest, sendBroadcast, updateBroadcast, deleteBroadcast, markSupportMessageAsRead, addToSchedule, updateScheduleItem, removeScheduleItem, addToWeeklyPlan, markAttendance, addQuestion, updateQuestionStatus: updateQuestionStatus as any, updateQuestion, deleteQuestion, addCompetition, joinCompetition, submitCompetitionResult, updateCompetitionStatus, addMapNode, updateMapNode, deleteMapNode, recordPurchase, addLesson, demoLogin }}>
+    <UserContext.Provider value={{ ...state, setRole, updateName, updateAvatar, updateFrame, addCoins, addXP, spendCoins, acceptQuest, earnBadge, getDashboardPath, markNotificationAsRead, addNotification, submitQuest, gradeQuest, addUser, removeUser, updateUser, addClass, removeClass, updateClass, addStage, removeStage, logout, addQuest, updateQuestStatus, addSupportMessage, addItemToInventory, addMarketItem, removeMarketItem, addBehaviorRequest, processBehaviorRequest, sendBroadcast, updateBroadcast, deleteBroadcast, markSupportMessageAsRead, addToSchedule, updateScheduleItem, removeScheduleItem, addToWeeklyPlan, markAttendance, addQuestion, updateQuestionStatus: updateQuestionStatus as any, updateQuestion, deleteQuestion, addCompetition, joinCompetition, submitCompetitionResult, updateCompetitionStatus, addMapNode, updateMapNode, deleteMapNode, recordPurchase, addLesson, demoLogin }}>
       {children}
     </UserContext.Provider>
   );
