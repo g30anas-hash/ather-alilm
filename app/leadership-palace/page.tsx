@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
+import { supabase } from "@/lib/supabaseClient";
 import GameCard from "@/components/GameCard";
 import GoldButton from "@/components/GoldButton";
 import SidebarWorld from "@/components/SidebarWorld";
@@ -17,7 +18,8 @@ import {
   Bell, 
   Bot, 
   ChevronDown, 
-  ChevronUp, 
+  ChevronUp,
+  Upload, 
   Info,
   Search,
   Filter,
@@ -806,6 +808,37 @@ function LeadershipPalacePageContent() {
   };
 
   const [showRoleModal, setShowRoleModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!e.target.files || e.target.files.length === 0) return;
+      
+      setIsUploading(true);
+      const file = e.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      try {
+          const { error: uploadError } = await supabase.storage
+              .from('market-items')
+              .upload(filePath, file);
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+              .from('market-items')
+              .getPublicUrl(filePath);
+
+          setMarketItemForm(prev => ({ ...prev, image: publicUrl }));
+          showToast("تم رفع الصورة بنجاح", "success");
+      } catch (error) {
+          console.error(error);
+          showToast("فشل رفع الصورة", "error");
+      } finally {
+          setIsUploading(false);
+      }
+  };
   const [editingRole, setEditingRole] = useState<any | null>(null);
   const [roleForm, setRoleForm] = useState({ name: "", permissions: [] as string[] });
   const [availableRoles, setAvailableRoles] = useState([
@@ -3658,18 +3691,26 @@ function LeadershipPalacePageContent() {
                         </div>
 
                         <div>
-                             <label className="block text-[#F4E4BC] mb-2 text-sm">رابط الصورة</label>
-                             <div className="flex gap-2">
-                                <input 
-                                    type="text" 
-                                    value={marketItemForm.image}
-                                    onChange={e => setMarketItemForm({...marketItemForm, image: e.target.value})}
-                                    className="flex-1 bg-[#000]/30 border border-[#5D4037] rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none text-xs" 
-                                    placeholder="https://..."
-                                />
-                                <div className="w-12 h-12 rounded-lg border border-[#5D4037] bg-[#000]/50 overflow-hidden shrink-0">
-                                    {marketItemForm.image && <img src={marketItemForm.image} alt="Preview" className="w-full h-full object-cover" />}
+                             <label className="block text-[#F4E4BC] mb-2 text-sm">صورة الكنز</label>
+                             <div className="flex flex-col gap-2">
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        value={marketItemForm.image}
+                                        onChange={e => setMarketItemForm({...marketItemForm, image: e.target.value})}
+                                        className="flex-1 bg-[#000]/30 border border-[#5D4037] rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none text-xs" 
+                                        placeholder="رابط الصورة أو ارفع ملف..."
+                                    />
+                                    <label className={`cursor-pointer bg-[#DAA520]/20 hover:bg-[#DAA520]/30 border border-[#DAA520] text-[#DAA520] rounded-lg p-3 flex items-center justify-center ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                        <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isUploading} />
+                                        {isUploading ? <div className="w-4 h-4 border-2 border-t-transparent border-[#DAA520] rounded-full animate-spin" /> : <Upload className="w-4 h-4" />}
+                                    </label>
                                 </div>
+                                {marketItemForm.image && (
+                                    <div className="w-full h-32 rounded-lg border border-[#5D4037] bg-[#000]/50 overflow-hidden relative">
+                                        <img src={marketItemForm.image} alt="Preview" className="w-full h-full object-contain" />
+                                    </div>
+                                )}
                              </div>
                         </div>
                         

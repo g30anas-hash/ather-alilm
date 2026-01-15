@@ -399,7 +399,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           { data: marketItems },
           { data: purchaseLogs },
           { data: supportMessages },
-          { data: lessons }
+          { data: lessons },
+          { data: submissions }
         ] = await Promise.all([
           supabase.from('users').select('*'),
           supabase.from('classes').select('*'),
@@ -413,7 +414,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           supabase.from('market_items').select('*'),
           supabase.from('purchase_logs').select('*'),
           supabase.from('support_messages').select('*'),
-          supabase.from('lessons').select('*')
+          supabase.from('lessons').select('*'),
+          supabase.from('quest_submissions').select('*')
         ]);
 
         // Map DB types to Frontend types
@@ -504,6 +506,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             createdAt: l.created_at
         }));
 
+        const mappedSubmissions = (submissions || []).map((s: any) => ({
+            ...s,
+            questId: s.quest_id,
+            questTitle: s.quest_title,
+            studentName: s.student_name,
+        }));
+
         setState(prev => ({
           ...prev,
           allUsers: mappedUsers,
@@ -518,7 +527,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           marketItems: mappedMarketItems,
           purchaseLogs: mappedPurchaseLogs,
           supportMessages: mappedSupportMessages,
-          lessons: mappedLessons
+          lessons: mappedLessons,
+          submissions: mappedSubmissions
         }));
 
         // Auth State Listener

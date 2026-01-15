@@ -1056,6 +1056,8 @@ function TeacherHallPageInner() {
         );
 
       case 'tasks':
+        // Filter quests/tasks. For now we use all quests but calculate submissions.
+        // In future: filter by teacher's created quests.
         return (
           <div className="space-y-4">
              <div className="flex justify-between items-center mb-4">
@@ -1071,31 +1073,34 @@ function TeacherHallPageInner() {
              </div>
 
              <div className="grid grid-cols-1 gap-4">
-               {[
-                 { title: "حل مسائل القسمة المطولة", class: "الصف الأول - أ", due: "غداً", submitted: "15/25", status: "active" },
-                 { title: "مشروع تاريخ الأندلس", class: "الصف الثاني - ب", due: "بعد 3 أيام", submitted: "5/22", status: "active" },
-                 { title: "اختبار العلوم القصير", class: "الصف الثالث - ج", due: "الأسبوع القادم", submitted: "0/28", status: "draft" },
-               ].map((task, i) => (
-                 <div key={i} className="bg-[#2A1B0E]/60 p-4 rounded-lg border border-[#5D4037] hover:border-[#DAA520] flex items-center justify-between group">
+               {quests.length === 0 ? (
+                    <div className="text-center py-10 text-[#F4E4BC]/50">
+                        <p>لا توجد مهام منشأة.</p>
+                    </div>
+               ) : (
+                quests.map((quest, i) => {
+                    const submissionCount = submissions.filter(s => s.questId === quest.id).length;
+                    return (
+                 <div key={quest.id} className="bg-[#2A1B0E]/60 p-4 rounded-lg border border-[#5D4037] hover:border-[#DAA520] flex items-center justify-between group">
                     <div className="flex items-center gap-4">
                        <div className={cn(
                          "w-12 h-12 rounded-lg flex items-center justify-center text-2xl",
-                         task.status === 'active' ? "bg-[#4ECDC4]/20 text-[#4ECDC4]" : "bg-[#F4E4BC]/10 text-[#F4E4BC]/50"
+                         quest.status === 'approved' ? "bg-[#4ECDC4]/20 text-[#4ECDC4]" : "bg-[#F4E4BC]/10 text-[#F4E4BC]/50"
                        )}>
-                         {task.status === 'active' ? "📝" : "✏️"}
+                         {quest.status === 'approved' ? "📝" : "✏️"}
                        </div>
                        <div>
-                          <h4 className="text-[#F4E4BC] font-bold text-lg">{task.title}</h4>
+                          <h4 className="text-[#F4E4BC] font-bold text-lg">{quest.title}</h4>
                           <p className="text-[#F4E4BC]/60 text-sm flex gap-3">
-                             <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {task.class}</span>
-                             <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {task.due}</span>
+                             <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {quest.grade || "عام"}</span>
+                             <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {quest.type}</span>
                           </p>
                        </div>
                     </div>
                     
                     <div className="flex items-center gap-6">
                        <div className="text-center">
-                          <span className="block text-[#FFD700] font-bold text-xl">{task.submitted}</span>
+                          <span className="block text-[#FFD700] font-bold text-xl">{submissionCount}</span>
                           <span className="text-[#F4E4BC]/40 text-xs">تم التسليم</span>
                        </div>
                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1104,7 +1109,8 @@ function TeacherHallPageInner() {
                        </div>
                     </div>
                  </div>
-               ))}
+                )})
+               )}
              </div>
           </div>
         );
