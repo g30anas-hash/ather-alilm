@@ -8,20 +8,10 @@ import GoldButton from "@/components/GoldButton";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Coins, Gem, ShoppingBag, Package, Gift, Sparkles, Shield, Lock, Crown } from "lucide-react";
-import { useUser } from "@/context/UserContext";
+import { useUser, MarketItem } from "@/context/UserContext";
 import { useToast } from "@/context/ToastContext";
 
-interface MarketItem {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  type: 'frame' | 'badge' | 'consumable';
-  image: string;
-  rarity: 'common' | 'rare' | 'epic' | 'legendary';
-}
-
-const marketItems: MarketItem[] = [
+const fallbackMarketItems: MarketItem[] = [
   {
     id: "frame_gold",
     name: "إطار الملك",
@@ -79,10 +69,12 @@ const marketItems: MarketItem[] = [
 ];
 
 function TreasuresPageContent() {
-  const { coins, spendCoins, addItemToInventory, inventory, recordPurchase, name, allUsers, role } = useUser();
+  const { coins, spendCoins, addItemToInventory, inventory, recordPurchase, name, allUsers, role, marketItems: dbMarketItems } = useUser();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'market' | 'inventory'>('market');
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
+
+  const shopItems = dbMarketItems.length ? dbMarketItems : fallbackMarketItems;
 
   const handleBuy = (item: MarketItem) => {
     // Check if already owned (for non-consumables)
@@ -227,7 +219,7 @@ function TreasuresPageContent() {
                         exit={{ opacity: 0, y: -20 }}
                         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
                       >
-                         {marketItems.map((item) => (
+                         {shopItems.map((item) => (
                             <div key={item.id} className="group bg-[#2A1B0E]/80 border border-[#5D4037] rounded-xl overflow-hidden hover:border-[#DAA520] transition-all duration-300 hover:shadow-[0_0_30px_rgba(218,165,32,0.1)] flex flex-col">
                                <div className="relative h-48 overflow-hidden">
                                   <div className="absolute inset-0 bg-gradient-to-t from-[#2A1B0E] to-transparent z-10" />

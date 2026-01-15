@@ -247,7 +247,7 @@ function LeadershipPalacePageContent() {
       price: 100,
       rarity: "common",
       image: "https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=magical%20item%20treasure&image_size=square",
-      type: "item"
+      type: "frame"
   });
 
   const handleSaveMarketItem = (e: React.FormEvent) => {
@@ -272,7 +272,7 @@ function LeadershipPalacePageContent() {
       }
       setShowMarketModal(false);
       setEditingMarketItem(null);
-      setMarketItemForm({ name: "", description: "", price: 100, rarity: "common", image: "https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=magical%20item%20treasure&image_size=square", type: "item" });
+      setMarketItemForm({ name: "", description: "", price: 100, rarity: "common", image: "https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=magical%20item%20treasure&image_size=square", type: "frame" });
   };
 
   const handleDeleteMarketItem = (id: string) => {
@@ -3686,10 +3686,9 @@ function LeadershipPalacePageContent() {
                                     onChange={e => setMarketItemForm({...marketItemForm, type: e.target.value})}
                                     className="w-full bg-[#000]/30 border border-[#5D4037] rounded-lg p-3 text-[#F4E4BC] focus:border-[#DAA520] outline-none"
                                 >
-                                    <option value="item">أداة</option>
+                                    <option value="frame">إطار</option>
                                     <option value="badge">وسام</option>
-                                    <option value="background">خلفية</option>
-                                    <option value="avatar">شخصية</option>
+                                    <option value="consumable">استهلاكي</option>
                                 </select>
                             </div>
                         </div>
